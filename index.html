@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wonderfield | Sistema Corporativo de Gastos de Viaje</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Work Sans', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            won: {
+              coral: '#de4f5f',
+              coralHover: '#c93b4c',
+              plum: '#433364',
+              plumDark: '#1e172a',
+              pinkSoft: '#fff5f7',
+              yellow: '#f5cd33',
+              bg: '#f8fafc',
+              border: '#e2e8f0',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts: Work Sans (Wonderfield typography) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Work+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap" rel="stylesheet">
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- SheetJS (XLSX) CDN para exportación a Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+  <!-- Estilos propios Wonderfield -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="h-full flex flex-col bg-[#f8fafc] text-[#0f172a] antialiased selection:bg-[#de4f5f] selection:text-white font-sans">
+
+  <!-- BARRA SUPERIOR DECORATIVA (CORAL WONDERFIELD) -->
+  <div class="h-1.5 w-full bg-[#de4f5f]"></div>
+
+  <!-- BARRA DE NAVEGACIÓN PRINCIPAL WONDERFIELD -->
+  <header class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm no-print">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-20">
+        
+        <!-- LOGO OFICIAL WONDERFIELD -->
+        <div class="flex items-center gap-3.5">
+          <div class="flex items-center gap-3">
+            <img src="img/logo.png" alt="Wonderfield Logo" class="h-12 w-auto object-contain flex-shrink-0" onerror="this.style.display='none'">
+            <div class="border-l-2 border-slate-200 pl-3">
+              <span class="text-xs font-black uppercase tracking-wider text-[#de4f5f] block">Wonderfield</span>
+              <h1 class="text-base sm:text-lg font-black tracking-tight text-slate-900 leading-none">
+                Control de Gastos de Viajes
+              </h1>
+              <p class="text-[11px] text-slate-500 font-medium mt-0.5 hidden sm:block">
+                Portal Internacional de Empleados &amp; Finanzas
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Acciones Rápidas Globales -->
+        <div class="flex items-center gap-2.5">
+          <button id="btnGlobalLoadDemo" type="button" title="Cargar datos de ejemplo Wonderfield" class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-[#433364] bg-slate-100 border border-slate-300 rounded-full hover:bg-slate-200 transition shadow-sm">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-[#de4f5f]"></i>
+            <span class="hidden sm:inline">Cargar</span> Demo
+          </button>
+
+          <button id="btnGlobalClear" type="button" title="Limpiar todos los registros" class="p-2 text-slate-500 hover:text-[#de4f5f] hover:bg-rose-50 rounded-full transition">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- BARRA DE PESTAÑAS WONDERFIELD (4 PESTAÑAS) -->
+      <div class="flex items-center gap-1 sm:gap-2 -mb-px border-t border-slate-200 pt-1 overflow-x-auto">
+        
+        <!-- PESTAÑA 1: AREA MANAGER (ACCESO POR CORREO) -->
+        <button id="navTabEmployee" type="button" class="main-tab active flex items-center gap-2 py-2.5 px-4 text-xs sm:text-sm font-black border-b-2 border-[#de4f5f] text-[#de4f5f] transition whitespace-nowrap" data-tab="employee">
+          <i data-lucide="user-check" class="w-4 h-4"></i>
+          <span>1. Area Manager (Gastos)</span>
+          <span id="badgeActiveEmployee" class="hidden ml-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-[#de4f5f]"></span>
+        </button>
+
+        <!-- PESTAÑA 2: JEFE DIRECTO -->
+        <button id="navTabManager" type="button" class="main-tab flex items-center gap-2 py-2.5 px-4 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-700 hover:text-slate-900 transition whitespace-nowrap" data-tab="manager">
+          <i data-lucide="shield-check" class="w-4 h-4 text-[#433364]"></i>
+          <span>2. Aprobación Jefe</span>
+          <i data-lucide="lock" class="w-3 h-3 text-slate-400"></i>
+          <span id="badgePendingManager" class="ml-1 px-2 py-0.5 rounded-full text-[11px] font-black bg-slate-200 text-slate-800">0</span>
+        </button>
+
+        <!-- PESTAÑA 3: FINANZAS -->
+        <button id="navTabFinance" type="button" class="main-tab flex items-center gap-2 py-2.5 px-4 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-700 hover:text-slate-900 transition whitespace-nowrap" data-tab="finance">
+          <i data-lucide="wallet" class="w-4 h-4 text-[#de4f5f]"></i>
+          <span>3. Finanzas & Pagos</span>
+          <i data-lucide="lock" class="w-3 h-3 text-slate-400"></i>
+          <span id="badgeApprovedFinance" class="ml-1 px-2 py-0.5 rounded-full text-[11px] font-black bg-slate-200 text-slate-800">0</span>
+        </button>
+
+        <!-- PESTAÑA 4: ADMINISTRADOR -->
+        <button id="navTabAdmin" type="button" class="main-tab flex items-center gap-2 py-2.5 px-4 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-700 hover:text-slate-900 transition whitespace-nowrap" data-tab="admin">
+          <i data-lucide="settings" class="w-4 h-4 text-[#433364]"></i>
+          <span>4. Administrador</span>
+          <i data-lucide="lock" class="w-3 h-3 text-slate-400"></i>
+        </button>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- TICKER DE TASAS DE CAMBIO (ALTO CONTRASTE: FONDO OSCURO SÓLIDO Y TEXTO BLANCO/DORADO) -->
+  <div class="bg-[#181224] text-white text-xs py-2.5 px-4 border-b border-[#2d2242] shadow-inner no-print">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-[#f5cd33] animate-pulse"></span>
+        <span class="font-black text-white flex items-center gap-1.5 tracking-wide">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-[#f5cd33]"></i>
+          Cotizaciones Wonderfield (Base EUR €):
+        </span>
+      </div>
+      <div id="ratesTicker" class="flex items-center flex-wrap gap-x-3 gap-y-1 font-mono text-[11px] text-white">
+        <span>Cargando cotizaciones oficiales...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- CONTENIDO PRINCIPAL: 4 PANELES -->
+  <!-- ========================================================================= -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- ======================================================================= -->
+    <!-- VISTA 1: AREA MANAGER (ACCESO POR CORREO & GESTIÓN INDIVIDUAL) -->
+    <!-- ======================================================================= -->
+    <section id="viewEmployee" class="tab-view space-y-6">
+      
+      <!-- 1.1 FORMULARIO DE ACCESO POR CORREO (SIN CONTRASEÑA) -->
+      <div id="empLoginBox" class="max-w-lg mx-auto bg-white p-7 sm:p-9 rounded-3xl border border-slate-200 shadow-xl space-y-6 my-8">
+        <div class="text-center space-y-3">
+          <img src="img/logo.png" alt="Wonderfield Logo" class="h-14 w-auto mx-auto object-contain" onerror="this.style.display='none'">
+          <h3 class="text-xl font-black text-slate-900">Portal de Gastos de Area Manager</h3>
+          <p class="text-xs text-slate-600 font-medium">
+            Ingresa tu correo corporativo de Wonderfield para acceder a tu historial privado de facturas y registrar gastos (sin contraseña).
+          </p>
+        </div>
+
+        <form id="empLoginForm" class="space-y-4">
+          <div>
+            <label for="empLoginEmail" class="block text-xs font-black text-slate-800 mb-1">
+              Correo Electrónico del Area Manager <span class="text-[#de4f5f]">*</span>
+            </label>
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <i data-lucide="mail" class="w-4 h-4 text-slate-500"></i>
+              </div>
+              <input type="email" id="empLoginEmail" required placeholder="carlos.mendoza@wonderfieldgroup.com" class="w-full pl-10 pr-3.5 py-3 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#de4f5f] font-medium text-slate-900">
+            </div>
+          </div>
+
+          <div id="empLoginError" class="hidden text-xs text-[#de4f5f] font-bold p-3 bg-rose-50 rounded-xl border border-rose-200"></div>
+
+          <button type="submit" class="w-full py-3.5 px-4 won-btn-primary font-black text-sm tracking-wide shadow-md">
+            Ingresar a mis Facturas y Gastos
+          </button>
+        </form>
+
+        <!-- SELECCIÓN RÁPIDA DE AREA MANAGERS (PARA PRUEBAS RÁPIDAS) -->
+        <div class="pt-4 border-t border-slate-200 space-y-2">
+          <span class="text-[11px] font-black text-slate-500 uppercase tracking-wider block text-center">
+            Selección Rápida de Area Manager:
+          </span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" id="quickAreaManagerButtons">
+            <!-- Render dinámico de botones de Area Manager -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 1.2 DASHBOARD PRIVADO DEL AREA MANAGER (VISIBLE AL INGRESAR CON SU CORREO) -->
+      <div id="empDashboard" class="space-y-6 hidden">
+        
+        <!-- BARRA SUPERIOR DE BIENVENIDA DEL AREA MANAGER -->
+        <div class="won-header-gradient text-white p-5 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md border border-slate-800">
+          <div class="flex items-center gap-3.5">
+            <div class="w-12 h-12 rounded-2xl bg-white/15 text-[#f5cd33] flex items-center justify-center flex-shrink-0">
+              <i data-lucide="user" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs text-slate-300 font-bold uppercase tracking-wider">Area Manager Activo:</span>
+                <h2 id="currentEmpName" class="text-lg font-black text-white">Carlos Mendoza</h2>
+              </div>
+              <p id="currentEmpDetails" class="text-xs text-slate-200 mt-0.5 font-medium">
+                carlos.mendoza@wonderfieldgroup.com • Región: Reino Unido & Taiko • 👔 Jefe Directo: Director Roberto Gómez
+              </p>
+            </div>
+          </div>
+
+          <button id="btnEmployeeLogout" type="button" class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-white/20 hover:bg-white/30 rounded-full transition shadow-xs">
+            <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Cambiar Area Manager
+          </button>
+        </div>
+
+        <!-- Banner de Métricas del Empleado (SOLO SUS GASTOS) -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <span class="text-slate-600 text-xs font-black uppercase tracking-wider block">Mis Gastos Totales</span>
+            <span id="empStatTotalEUR" class="text-2xl font-black text-slate-900 mt-1 block">0,00 €</span>
+            <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-[#de4f5f]"></div>
+          </div>
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <span class="text-[#de4f5f] text-xs font-black uppercase tracking-wider block">Pendientes de mi Jefe</span>
+            <span id="empStatPending" class="text-2xl font-black text-[#de4f5f] mt-1 block">0</span>
+            <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-[#de4f5f]"></div>
+          </div>
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <span class="text-[#433364] text-xs font-black uppercase tracking-wider block">Aprobados por mi Jefe</span>
+            <span id="empStatApproved" class="text-2xl font-black text-[#433364] mt-1 block">0</span>
+            <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-[#433364]"></div>
+          </div>
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <span class="text-emerald-700 text-xs font-black uppercase tracking-wider block">Mis Gastos Liquidados</span>
+            <span id="empStatPaid" class="text-2xl font-black text-emerald-700 mt-1 block">0</span>
+            <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-emerald-600"></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+          <!-- COLUMNA IZQUIERDA: FORMULARIO DE GASTO -->
+          <div class="lg:col-span-5">
+            <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden sticky top-28">
+              
+              <!-- Cabecera de Formulario -->
+              <div class="p-5 won-header-gradient text-white flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-[#f5cd33]">
+                    <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                  </div>
+                  <div>
+                    <h2 id="formTitle" class="font-black text-base tracking-tight text-white">Registrar Gasto de Viaje</h2>
+                    <p class="text-xs text-slate-200 font-medium">The Wonderfield Group • Gastos Internacionales</p>
+                  </div>
+                </div>
+                <button id="btnCancelEdit" type="button" class="hidden text-xs text-[#f5cd33] hover:text-white underline font-bold">
+                  Cancelar edición
+                </button>
+              </div>
+
+              <form id="expenseForm" class="p-5 space-y-4">
+                <input type="hidden" id="expenseId" value="">
+
+                <!-- 1. TIPO DOCUMENTO -->
+                <div>
+                  <label class="block text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5">
+                    Tipo de Comprobante <span class="text-[#de4f5f]">*</span>
+                  </label>
+                  <div class="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
+                    <label class="relative flex items-center justify-center gap-2 p-2.5 rounded-xl cursor-pointer transition select-none has-[:checked]:bg-white has-[:checked]:text-[#de4f5f] has-[:checked]:shadow-sm has-[:checked]:font-black text-slate-700 text-sm font-semibold">
+                      <input type="radio" name="docType" value="factura" class="sr-only" checked>
+                      <i data-lucide="file-text" class="w-4 h-4 text-[#de4f5f]"></i>
+                      <span>Factura</span>
+                    </label>
+                    <label class="relative flex items-center justify-center gap-2 p-2.5 rounded-xl cursor-pointer transition select-none has-[:checked]:bg-white has-[:checked]:text-[#433364] has-[:checked]:shadow-sm has-[:checked]:font-black text-slate-700 text-sm font-semibold">
+                      <input type="radio" name="docType" value="ticket" class="sr-only">
+                      <i data-lucide="receipt" class="w-4 h-4 text-[#433364]"></i>
+                      <span>Ticket / Recibo</span>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- 2. EMPLEADO (AUTOASIGNADO) & DESTINO -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label for="employeeInput" class="block text-xs font-black text-slate-800 mb-1">
+                      Area Manager Solicitante
+                    </label>
+                    <input type="text" id="employeeInput" required readonly class="block w-full px-3.5 py-2.5 text-sm bg-slate-100 border border-slate-300 rounded-xl font-bold text-slate-800 cursor-not-allowed">
+                    <span id="detectedBossInfo" class="text-[11px] text-[#433364] font-black mt-1 block"></span>
+                  </div>
+
+                  <div>
+                    <label for="tripInput" class="block text-xs font-black text-slate-800 mb-1">
+                      Destino / Nombre del Viaje
+                    </label>
+                    <input type="text" id="tripInput" placeholder="Ej. Convención Anual Londres" class="block w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#de4f5f] focus:border-[#de4f5f] font-medium transition">
+                  </div>
+                </div>
+
+                <!-- 3. FECHA & CATEGORÍA -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label for="dateInput" class="block text-xs font-black text-slate-800 mb-1">
+                      Fecha del Gasto <span class="text-[#de4f5f]">*</span>
+                    </label>
+                    <input type="date" id="dateInput" required class="block w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#de4f5f] font-medium transition">
+                  </div>
+
+                  <div>
+                    <label for="categoryInput" class="block text-xs font-black text-slate-800 mb-1">
+                      Categoría <span class="text-[#de4f5f]">*</span>
+                    </label>
+                    <select id="categoryInput" required class="block w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#de4f5f] font-bold text-slate-800 transition">
+                      <option value="Alojamiento">🏨 Alojamiento / Hotel</option>
+                      <option value="Transporte y Vuelos">✈️ Transporte y Vuelos</option>
+                      <option value="Comidas y Dietas">🍽️ Comidas y Dietas</option>
+                      <option value="Taxi y Movilidad">🚕 Taxi y Movilidad</option>
+                      <option value="Clientes y Comercial">🤝 Clientes y Comercial</option>
+                      <option value="Otros" selected>📦 Otros Gastos</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- 4. MOTIVO / CONCEPTO -->
+                <div>
+                  <label for="reasonInput" class="block text-xs font-black text-slate-800 mb-1">
+                    Motivo / Concepto del Gasto <span class="text-[#de4f5f]">*</span>
+                  </label>
+                  <input type="text" id="reasonInput" required placeholder="Ej. Alojamiento Hotel 2 noches en Londres" class="block w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#de4f5f] font-medium transition">
+                </div>
+
+                <!-- 5. IMPORTE, DIVISA Y CONVERSIÓN A EUR -->
+                <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                      <i data-lucide="coins" class="w-4 h-4 text-[#de4f5f]"></i>
+                      Importe en Divisa de Viaje
+                    </span>
+                    <span id="rateBadge" class="text-[11px] font-bold text-slate-700 bg-white px-3 py-0.5 rounded-full border border-slate-200">
+                      1 EUR = 1 EUR
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-12 gap-2.5">
+                    <div class="col-span-7">
+                      <label for="amountInput" class="block text-[11px] font-bold text-slate-700 mb-1">
+                        Importe Original <span class="text-[#de4f5f]">*</span>
+                      </label>
+                      <input type="number" id="amountInput" step="0.01" min="0.01" required placeholder="0.00" class="block w-full px-3.5 py-2.5 text-base font-black text-slate-900 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#de4f5f] transition">
+                    </div>
+
+                    <div class="col-span-5">
+                      <label for="currencySelect" class="block text-[11px] font-bold text-slate-700 mb-1">
+                        Moneda
+                      </label>
+                      <select id="currencySelect" class="block w-full px-2.5 py-2.5 text-sm font-black text-[#433364] bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#de4f5f] transition">
+                        <option value="EUR" selected>🇪🇺 EUR - Euro (€)</option>
+                        <option value="USD">🇺🇸 USD - Dólar ($)</option>
+                        <option value="GBP">🇬🇧 GBP - Libra (£)</option>
+                        <option value="CHF">🇨🇭 CHF - Franco (CHF)</option>
+                        <option value="AUD">🇦🇺 AUD - Dólar (A$)</option>
+                        <option value="SEK">🇸🇪 SEK - Suecia (kr)</option>
+                        <option value="NOK">🇳🇴 NOK - Noruega (kr)</option>
+                        <option value="DKK">🇩🇰 DKK - Dinamarca (kr)</option>
+                        <option value="PLN">🇵🇱 PLN - Polonia (zł)</option>
+                        <option value="CZK">🇨🇿 CZK - Chequia (Kč)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between shadow-xs">
+                    <div>
+                      <span class="text-[10px] text-slate-500 block font-bold uppercase">Total convertido a:</span>
+                      <span class="text-xs font-black text-slate-900">Euros (€)</span>
+                    </div>
+                    <div class="text-right">
+                      <span id="convertedAmountEUR" class="text-2xl font-black text-[#de4f5f]">0,00 €</span>
+                      <input type="hidden" id="calculatedEurAmount" value="0">
+                      <input type="hidden" id="currentRateUsed" value="1">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 6. DESGLOSE DE IVA -->
+                <div id="ivaSection" class="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <input type="checkbox" id="hasIvaToggle" class="w-4 h-4 text-[#433364] rounded border-slate-300 focus:ring-[#433364]">
+                      <label for="hasIvaToggle" class="text-xs font-black text-slate-900 cursor-pointer select-none">
+                        ¿Esta factura incluye / requiere IVA?
+                      </label>
+                    </div>
+                    <span class="text-[10px] uppercase font-black text-[#433364] bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                      Deducible
+                    </span>
+                  </div>
+
+                  <div id="ivaDetailsContainer" class="space-y-3 pt-2 border-t border-slate-200 hidden">
+                    <div>
+                      <label class="block text-[11px] font-bold text-slate-700 mb-1.5">
+                        Porcentaje de IVA aplicable (%)
+                      </label>
+                      <div class="grid grid-cols-4 gap-1.5">
+                        <button type="button" class="iva-btn px-2 py-1.5 text-xs font-bold bg-white text-slate-800 border border-slate-300 rounded-xl hover:bg-slate-100 transition" data-rate="21">21%</button>
+                        <button type="button" class="iva-btn px-2 py-1.5 text-xs font-bold bg-white text-slate-800 border border-slate-300 rounded-xl hover:bg-slate-100 transition" data-rate="10">10%</button>
+                        <button type="button" class="iva-btn px-2 py-1.5 text-xs font-bold bg-white text-slate-800 border border-slate-300 rounded-xl hover:bg-slate-100 transition" data-rate="4">4%</button>
+                        <button type="button" class="iva-btn px-2 py-1.5 text-xs font-bold bg-white text-slate-800 border border-slate-300 rounded-xl hover:bg-slate-100 transition" data-rate="custom">Otro %</button>
+                      </div>
+                      
+                      <div id="customIvaContainer" class="mt-2 hidden">
+                        <div class="relative">
+                          <input type="number" id="customIvaInput" min="0" max="100" step="0.1" placeholder="Ej. 20% (UK VAT)" class="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#433364] font-bold">
+                          <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-xs font-black text-slate-600">%</span>
+                        </div>
+                      </div>
+                      <input type="hidden" id="selectedIvaRate" value="21">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-xs bg-white p-3 rounded-xl border border-slate-200">
+                      <div>
+                        <span class="text-slate-500 block text-[10px] font-bold uppercase">Base Imponible:</span>
+                        <span id="displayBaseEUR" class="font-black text-slate-900 text-sm">0,00 €</span>
+                      </div>
+                      <div class="text-right">
+                        <span class="text-[#de4f5f] block text-[10px] font-bold uppercase">Cuota IVA:</span>
+                        <span id="displayIvaEUR" class="font-black text-[#de4f5f] text-sm">0,00 €</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 7. FOTO DEL COMPROBANTE -->
+                <div>
+                  <label class="block text-xs font-black text-slate-800 mb-1">
+                    Foto / Comprobante Adjunto
+                  </label>
+                  <div id="dropzone" class="dropzone p-4 rounded-2xl text-center cursor-pointer relative group">
+                    <input type="file" id="receiptFileInput" accept="image/*,application/pdf" class="sr-only">
+                    
+                    <div id="dropzonePrompt" class="space-y-1 py-1">
+                      <div class="w-10 h-10 mx-auto rounded-full bg-rose-50 text-[#de4f5f] flex items-center justify-center group-hover:scale-110 transition transform">
+                        <i data-lucide="camera" class="w-5 h-5"></i>
+                      </div>
+                      <div class="text-xs text-slate-900 font-bold">
+                        <span class="text-[#de4f5f]">Subir comprobante</span> o arrastra aquí
+                      </div>
+                      <p class="text-[10px] text-slate-500 font-medium">JPG, PNG, WebP o captura de ticket</p>
+                    </div>
+
+                    <div id="previewContainer" class="hidden relative">
+                      <div class="relative inline-block">
+                        <img id="receiptPreviewImg" src="" alt="Vista previa" class="max-h-32 mx-auto rounded-xl shadow-sm border border-slate-200 object-contain">
+                        <button type="button" id="btnRemoveImage" class="absolute -top-2 -right-2 p-1 bg-[#de4f5f] text-white rounded-full hover:bg-red-700 shadow-md">
+                          <i data-lucide="x" class="w-3 h-3"></i>
+                        </button>
+                      </div>
+                      <p id="receiptFileName" class="text-[11px] text-slate-700 mt-1 truncate max-w-xs mx-auto font-bold"></p>
+                    </div>
+                  </div>
+                  <input type="hidden" id="receiptBase64" value="">
+                </div>
+
+                <!-- BOTÓN ENVIAR -->
+                <div class="pt-2">
+                  <button type="submit" id="btnSubmitExpense" class="w-full py-3.5 px-4 won-btn-primary font-black shadow-md flex items-center justify-center gap-2 text-sm tracking-wide">
+                    <i data-lucide="send" class="w-4 h-4"></i>
+                    <span id="btnSubmitText">Enviar Gasto a Aprobación</span>
+                  </button>
+                </div>
+
+              </form>
+            </div>
+          </div>
+
+          <!-- COLUMNA DERECHA: HISTORIAL PRIVADO DE FACTURAS DEL AREA MANAGER -->
+          <div class="lg:col-span-7 space-y-4">
+            <div class="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                <div class="relative flex-1">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
+                  </div>
+                  <input type="text" id="empSearchInput" placeholder="Buscar en mis comprobantes..." class="block w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#de4f5f] font-medium">
+                </div>
+
+                <div class="w-full sm:w-48">
+                  <select id="empFilterTripSelect" class="w-full px-3 py-2 text-xs font-bold text-[#433364] bg-white border border-slate-300 rounded-xl">
+                    <option value="">Todos mis viajes</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200 text-xs">
+                <div class="flex items-center gap-1.5">
+                  <button type="button" class="emp-filter-tab active px-3.5 py-1 font-bold rounded-full bg-[#de4f5f] text-white" data-filter="all">Todos</button>
+                  <button type="button" class="emp-filter-tab px-3.5 py-1 font-bold rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200" data-filter="PENDING">Pendientes</button>
+                  <button type="button" class="emp-filter-tab px-3.5 py-1 font-bold rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200" data-filter="APPROVED">Aprobados</button>
+                  <button type="button" class="emp-filter-tab px-3.5 py-1 font-bold rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200" data-filter="PAID">Pagados</button>
+                </div>
+                <span id="empFilteredCountText" class="text-slate-600 text-[11px] font-bold">0 gastos</span>
+              </div>
+            </div>
+
+            <div id="empExpenseListContainer" class="space-y-3"></div>
+
+            <div id="empEmptyState" class="hidden bg-white rounded-3xl border-2 border-dashed border-slate-200 p-10 text-center space-y-2">
+              <div class="w-12 h-12 mx-auto rounded-2xl bg-rose-50 text-[#de4f5f] flex items-center justify-center">
+                <i data-lucide="receipt" class="w-6 h-6"></i>
+              </div>
+              <h3 class="text-sm font-bold text-slate-900">No tienes gastos registrados aún</h3>
+              <p class="text-xs text-slate-500">Usa el formulario a la izquierda para cargar tu primera factura o ticket de viaje.</p>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- VISTA 2: APROBACIÓN JEFE DIRECTO -->
+    <!-- ======================================================================= -->
+    <section id="viewManager" class="tab-view space-y-6 hidden">
+
+      <!-- LOGIN JEFE -->
+      <div id="managerLoginBox" class="max-w-md mx-auto bg-white p-7 sm:p-9 rounded-3xl border border-slate-200 shadow-xl space-y-5 my-8">
+        <div class="text-center space-y-2">
+          <div class="w-14 h-14 mx-auto rounded-2xl bg-indigo-50 text-[#433364] flex items-center justify-center">
+            <i data-lucide="shield-check" class="w-7 h-7"></i>
+          </div>
+          <h3 class="text-xl font-black text-slate-900">Acceso Jefe Directo</h3>
+          <p class="text-xs text-slate-600">The Wonderfield Group • Supervisión y Aprobaciones</p>
+        </div>
+
+        <form id="managerLoginForm" class="space-y-4">
+          <div>
+            <label class="block text-xs font-black text-slate-800 mb-1">Usuario</label>
+            <input type="text" id="mgrUsername" required placeholder="jefe" class="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#433364] font-medium">
+          </div>
+          <div>
+            <label class="block text-xs font-black text-slate-800 mb-1">Contraseña</label>
+            <input type="password" id="mgrPassword" required placeholder="jefe123" class="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#433364] font-medium">
+          </div>
+
+          <div id="mgrLoginError" class="hidden text-xs text-[#de4f5f] font-bold p-3 bg-rose-50 rounded-xl border border-rose-200"></div>
+
+          <button type="submit" class="w-full py-3.5 px-4 won-btn-secondary font-black text-sm tracking-wide">
+            Iniciar Sesión como Jefe
+          </button>
+        </form>
+
+        <div class="pt-3 border-t border-slate-200 text-center">
+          <button type="button" id="btnAutoFillManager" class="text-xs text-[#433364] hover:text-slate-900 font-bold flex items-center justify-center gap-1 mx-auto">
+            <i data-lucide="key-round" class="w-3.5 h-3.5"></i> Autocompletar credenciales (jefe / jefe123)
+          </button>
+        </div>
+      </div>
+
+      <!-- DASHBOARD JEFE -->
+      <div id="managerDashboard" class="space-y-6 hidden">
+        <div class="won-header-gradient text-white p-5 rounded-3xl flex flex-wrap items-center justify-between gap-4 shadow-md">
+          <div class="flex items-center gap-3.5">
+            <div class="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center text-[#f5cd33]">
+              <i data-lucide="user-check" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <span class="text-xs text-slate-300 font-bold uppercase tracking-wider block">Sesión activa como Supervisor</span>
+              <h2 id="mgrUserDisplayName" class="text-lg font-black tracking-tight text-white">Director Roberto Gómez</h2>
+            </div>
+          </div>
+          
+          <button id="btnManagerLogout" type="button" class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-white/20 hover:bg-white/30 rounded-full transition">
+            <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Cerrar Sesión
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <span class="text-[#de4f5f] text-xs font-black uppercase block">Por Revisar</span>
+            <span id="mgrStatPendingCount" class="text-2xl font-black text-[#de4f5f]">0</span>
+            <span class="text-[10px] text-slate-500 font-medium block mt-0.5">Solicitudes pendientes</span>
+          </div>
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <span class="text-[#433364] text-xs font-black uppercase block">Aprobadas</span>
+            <span id="mgrStatApprovedCount" class="text-2xl font-black text-[#433364]">0</span>
+            <span class="text-[10px] text-slate-500 font-medium block mt-0.5">Listas para Finanzas</span>
+          </div>
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <span class="text-red-600 text-xs font-black uppercase block">Rechazadas</span>
+            <span id="mgrStatRejectedCount" class="text-2xl font-black text-red-600">0</span>
+            <span class="text-[10px] text-slate-500 font-medium block mt-0.5">Con motivo notificado</span>
+          </div>
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <span class="text-slate-600 text-xs font-black uppercase block">Monto en Revisión</span>
+            <span id="mgrStatPendingEUR" class="text-xl font-black text-slate-900">0,00 €</span>
+            <span class="text-[10px] text-slate-500 font-medium block mt-0.5">Equivalente en EUR</span>
+          </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+            <div class="flex items-center gap-2">
+              <button type="button" id="mgrTabPending" class="mgr-subtab active px-4 py-2 text-xs font-black rounded-full bg-[#433364] text-white flex items-center gap-1.5" data-filter="PENDING">
+                <i data-lucide="clock" class="w-3.5 h-3.5 text-[#f5cd33]"></i>
+                <span>Pendientes de Aprobación</span>
+                <span id="mgrSubBadgePending" class="px-2 py-0.2 rounded-full text-[10px] bg-white text-[#433364] font-black">0</span>
+              </button>
+              <button type="button" id="mgrTabHistory" class="mgr-subtab px-4 py-2 text-xs font-bold rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 flex items-center gap-1.5" data-filter="HISTORY">
+                <i data-lucide="history" class="w-3.5 h-3.5"></i>
+                <span>Histórico de Decisiones</span>
+              </button>
+            </div>
+            <span id="mgrCountText" class="text-xs text-slate-600 font-bold hidden sm:inline">0 solicitudes</span>
+          </div>
+
+          <div id="mgrListContainer" class="space-y-3"></div>
+
+          <div id="mgrEmptyState" class="hidden text-center py-10 space-y-2">
+            <div class="w-12 h-12 mx-auto rounded-2xl bg-rose-50 text-[#de4f5f] flex items-center justify-center">
+              <i data-lucide="check-circle-2" class="w-6 h-6"></i>
+            </div>
+            <h4 class="text-sm font-bold text-slate-900">¡Bandeja al día!</h4>
+            <p class="text-xs text-slate-500">No hay comprobantes pendientes de aprobación en este momento.</p>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- VISTA 3: GESTIÓN FINANCIERA & PAGOS -->
+    <!-- ======================================================================= -->
+    <section id="viewFinance" class="tab-view space-y-6 hidden">
+
+      <!-- LOGIN FINANZAS -->
+      <div id="financeLoginBox" class="max-w-md mx-auto bg-white p-7 sm:p-9 rounded-3xl border border-slate-200 shadow-xl space-y-5 my-8">
+        <div class="text-center space-y-2">
+          <div class="w-14 h-14 mx-auto rounded-2xl bg-rose-50 text-[#de4f5f] flex items-center justify-center">
+            <i data-lucide="landmark" class="w-7 h-7"></i>
+          </div>
+          <h3 class="text-xl font-black text-slate-900">Acceso Departamento Financiero</h3>
+          <p class="text-xs text-slate-600">The Wonderfield Group • Liquidación y Exportación Contable</p>
+        </div>
+
+        <form id="financeLoginForm" class="space-y-4">
+          <div>
+            <label class="block text-xs font-black text-slate-800 mb-1">Usuario</label>
+            <input type="text" id="finUsername" required placeholder="finanzas" class="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#de4f5f] font-medium">
+          </div>
+          <div>
+            <label class="block text-xs font-black text-slate-800 mb-1">Contraseña</label>
+            <input type="password" id="finPassword" required placeholder="finanzas123" class="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#de4f5f] font-medium">
+          </div>
+
+          <div id="finLoginError" class="hidden text-xs text-[#de4f5f] font-bold p-3 bg-rose-50 rounded-xl border border-rose-200"></div>
+
+          <button type="submit" class="w-full py-3.5 px-4 won-btn-primary font-black text-sm tracking-wide">
+            Iniciar Sesión como Finanzas
+          </button>
+        </form>
+
+        <div class="pt-3 border-t border-slate-200 text-center">
+          <button type="button" id="btnAutoFillFinance" class="text-xs text-[#de4f5f] hover:text-red-700 font-bold flex items-center justify-center gap-1 mx-auto">
+            <i data-lucide="key-round" class="w-3.5 h-3.5"></i> Autocompletar credenciales (finanzas / finanzas123)
+          </button>
+        </div>
+      </div>
+
+      <!-- DASHBOARD FINANZAS -->
+      <div id="financeDashboard" class="space-y-6 hidden">
+        <div class="won-plum-gradient text-white p-5 sm:p-6 rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg border border-slate-800">
+          <div class="flex items-center gap-3.5">
+            <div class="w-12 h-12 rounded-2xl bg-white/15 text-[#f5cd33] border border-white/20 flex items-center justify-center">
+              <i data-lucide="landmark" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <span class="text-xs text-slate-300 font-bold uppercase tracking-wider block">Panel de Tesorería & Finanzas</span>
+              <h2 id="finUserDisplayName" class="text-lg font-black text-white">Lic. Laura Martínez (Tesorería)</h2>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 w-full md:w-auto">
+            <!-- BOTÓN EXPORTAR EXCEL WONDERFIELD -->
+            <button id="btnFinanceExportExcel" type="button" class="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-black text-white bg-[#de4f5f] hover:bg-[#c93b4c] active:bg-[#b82638] rounded-full shadow-lg transition transform hover:-translate-y-0.5 tracking-wide">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4 text-[#f5cd33]"></i>
+              <span>Descargar Excel (.xlsx)</span>
+            </button>
+
+            <button id="btnFinanceLogout" type="button" class="inline-flex items-center gap-1 px-4 py-3 text-xs font-bold text-slate-300 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition">
+              <i data-lucide="log-out" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <span class="text-slate-600 text-xs font-black uppercase block">Total Gastos Global</span>
+            <p id="finStatTotalEUR" class="text-2xl font-black text-slate-900 mt-1">0,00 €</p>
+            <div class="text-[11px] text-slate-500 mt-1 font-medium"><span id="finStatTotalCount">0</span> registros totales</div>
+            <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-[#433364]"></div>
+          </div>
+
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <span class="text-emerald-700 text-xs font-black uppercase block">Total Liquidado</span>
+            <p id="finStatPaidEUR" class="text-2xl font-black text-emerald-700 mt-1">0,00 €</p>
+            <div class="text-[11px] text-slate-500 mt-1 font-medium"><span id="finStatPaidCount">0</span> transferencias</div>
+            <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-emerald-600"></div>
+          </div>
+
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <span class="text-[#de4f5f] text-xs font-black uppercase block">Pendiente de Pago</span>
+            <p id="finStatPendingPayEUR" class="text-2xl font-black text-[#de4f5f] mt-1">0,00 €</p>
+            <div class="text-[11px] text-slate-500 mt-1 font-medium"><span id="finStatPendingPayCount">0</span> aprobados</div>
+            <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-[#de4f5f]"></div>
+          </div>
+
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <span class="text-[#433364] text-xs font-black uppercase block">IVA Deducible Total</span>
+            <p id="finStatIvaEUR" class="text-2xl font-black text-[#433364] mt-1">0,00 €</p>
+            <div class="text-[11px] text-slate-500 mt-1 font-medium"><span id="finStatIvaCount">0</span> facturas con IVA</div>
+            <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-[#f5cd33]"></div>
+          </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div class="relative flex-1">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
+              </div>
+              <input type="text" id="finSearchInput" placeholder="Buscar por empleado, motivo, destino, referencia..." class="block w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#de4f5f] font-medium">
+            </div>
+
+            <div class="w-full sm:w-52">
+              <select id="finFilterTripSelect" class="w-full px-3 py-2 text-xs font-bold text-[#433364] bg-white border border-slate-300 rounded-xl">
+                <option value="">Todos los viajes</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200 text-xs">
+            <div class="flex flex-wrap items-center gap-1.5">
+              <button type="button" class="fin-tab active px-3.5 py-1 font-bold rounded-full bg-[#de4f5f] text-white" data-filter="all">Todos</button>
+              <button type="button" class="fin-tab px-3.5 py-1 font-bold rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200" data-filter="APPROVED">⏳ Listos para Pagar (Aprobados)</button>
+              <button type="button" class="fin-tab px-3.5 py-1 font-bold rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200" data-filter="PAID">💳 Ya Pagados</button>
+              <button type="button" class="fin-tab px-3.5 py-1 font-bold rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200" data-filter="PENDING">🟡 En Revisión Jefe</button>
+              <button type="button" class="fin-tab px-3.5 py-1 font-bold rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200" data-filter="REJECTED">🔴 Rechazados</button>
+            </div>
+            <span id="finFilteredCountText" class="text-slate-600 text-xs font-bold">0 registros</span>
+          </div>
+
+          <div id="finListContainer" class="space-y-3"></div>
+
+          <div id="finEmptyState" class="hidden text-center py-10 space-y-2">
+            <div class="w-12 h-12 mx-auto rounded-2xl bg-slate-100 text-slate-500 flex items-center justify-center">
+              <i data-lucide="inbox" class="w-6 h-6"></i>
+            </div>
+            <h4 class="text-sm font-bold text-slate-900">No hay registros con este filtro</h4>
+            <p class="text-xs text-slate-500">Prueba cambiando el filtro de búsqueda o el estado.</p>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- VISTA 4: PANEL DE ADMINISTRADOR -->
+    <!-- ======================================================================= -->
+    <section id="viewAdmin" class="tab-view space-y-6 hidden">
+
+      <!-- LOGIN ADMINISTRADOR -->
+      <div id="adminLoginBox" class="max-w-md mx-auto bg-white p-7 sm:p-9 rounded-3xl border border-slate-200 shadow-xl space-y-5 my-8">
+        <div class="text-center space-y-2">
+          <div class="w-14 h-14 mx-auto rounded-2xl bg-indigo-50 text-[#433364] flex items-center justify-center">
+            <i data-lucide="shield" class="w-7 h-7"></i>
+          </div>
+          <h3 class="text-xl font-black text-slate-900">Panel de Administración</h3>
+          <p class="text-xs text-slate-600">The Wonderfield Group • Gestión de Jerarquías & Cuentas</p>
+        </div>
+
+        <form id="adminLoginForm" class="space-y-4">
+          <div>
+            <label class="block text-xs font-black text-slate-800 mb-1">Usuario Administrador</label>
+            <input type="text" id="admUsername" required placeholder="admin" class="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#433364] font-medium">
+          </div>
+          <div>
+            <label class="block text-xs font-black text-slate-800 mb-1">Contraseña</label>
+            <input type="password" id="admPassword" required placeholder="admin123" class="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#433364] font-medium">
+          </div>
+
+          <div id="admLoginError" class="hidden text-xs text-[#de4f5f] font-bold p-3 bg-rose-50 rounded-xl border border-rose-200"></div>
+
+          <button type="submit" class="w-full py-3.5 px-4 won-btn-secondary font-black text-sm tracking-wide">
+            Iniciar Sesión como Administrador
+          </button>
+        </form>
+
+        <div class="pt-3 border-t border-slate-200 text-center">
+          <button type="button" id="btnAutoFillAdmin" class="text-xs text-[#433364] hover:text-slate-900 font-bold flex items-center justify-center gap-1 mx-auto">
+            <i data-lucide="key-round" class="w-3.5 h-3.5"></i> Autocompletar credenciales (admin / admin123)
+          </button>
+        </div>
+      </div>
+
+      <!-- DASHBOARD ADMINISTRADOR -->
+      <div id="adminDashboard" class="space-y-6 hidden">
+        
+        <div class="won-header-gradient text-white p-5 rounded-3xl flex flex-wrap items-center justify-between gap-4 shadow-lg border border-slate-800">
+          <div class="flex items-center gap-3.5">
+            <div class="w-12 h-12 rounded-2xl bg-white/15 text-[#f5cd33] border border-white/20 flex items-center justify-center">
+              <i data-lucide="sliders" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <span class="text-xs text-slate-300 font-bold uppercase tracking-wider block">The Wonderfield Group • Configuración</span>
+              <h2 id="admUserDisplayName" class="text-lg font-black text-white">Administrador Principal</h2>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button id="btnAdminLogout" type="button" class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-slate-300 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition">
+              <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Cerrar Sesión
+            </button>
+          </div>
+        </div>
+
+        <!-- Sub-Pestañas Admin -->
+        <div class="flex items-center gap-2 border-b border-slate-200 pb-2">
+          <button type="button" id="admSubTabManagers" class="adm-subtab active px-4 py-2 text-xs sm:text-sm font-black rounded-full bg-[#433364] text-white flex items-center gap-2 shadow-sm" data-subtab="managers">
+            <i data-lucide="users" class="w-4 h-4 text-[#f5cd33]"></i>
+            <span>1. Area Managers & Jefes Directos</span>
+          </button>
+          
+          <button type="button" id="admSubTabUsers" class="adm-subtab px-4 py-2 text-xs sm:text-sm font-bold rounded-full bg-white text-slate-700 hover:bg-slate-100 border border-slate-300 flex items-center gap-2 transition" data-subtab="users">
+            <i data-lucide="key" class="w-4 h-4 text-slate-600"></i>
+            <span>2. Usuarios & Contraseñas</span>
+          </button>
+        </div>
+
+        <!-- SECCIÓN 1: AREA MANAGERS -->
+        <div id="admSectionManagers" class="space-y-4">
+          <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div>
+                <h3 class="text-base font-black text-slate-900">Directorio de Jerarquía y Notificaciones Wonderfield</h3>
+                <p class="text-xs text-slate-600">Asigna a cada Area Manager su Jefe Directo y correo electrónico para alertas automáticas</p>
+              </div>
+
+              <button type="button" id="btnNewAreaManager" class="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs sm:text-sm font-black text-white bg-[#433364] hover:bg-[#2f2347] rounded-full shadow-sm transition">
+                <i data-lucide="user-plus" class="w-4 h-4 text-[#f5cd33]"></i>
+                <span>Nuevo Area Manager</span>
+              </button>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-left text-xs divide-y divide-slate-200">
+                <thead class="bg-slate-100 text-[#433364] font-black uppercase tracking-wider">
+                  <tr>
+                    <th class="px-4 py-3">Area Manager</th>
+                    <th class="px-4 py-3">Región / Marca</th>
+                    <th class="px-4 py-3">Jefe Directo Asignado</th>
+                    <th class="px-4 py-3">Correo del Jefe</th>
+                    <th class="px-4 py-3 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="areaManagersTableBody" class="divide-y divide-slate-200 bg-white font-medium">
+                  <!-- Render dinámico -->
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- SECCIÓN 2: USUARIOS Y CONTRASEÑAS -->
+        <div id="admSectionUsers" class="space-y-4 hidden">
+          <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div>
+                <h3 class="text-base font-black text-slate-900">Cuentas de Acceso Wonderfield</h3>
+                <p class="text-xs text-slate-600">Administra usuarios, permisos de rol y contraseñas de acceso al sistema</p>
+              </div>
+
+              <button type="button" id="btnNewUser" class="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs sm:text-sm font-black text-white bg-[#433364] hover:bg-[#2f2347] rounded-full shadow-sm transition">
+                <i data-lucide="plus" class="w-4 h-4 text-[#f5cd33]"></i>
+                <span>Crear Usuario</span>
+              </button>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-left text-xs divide-y divide-slate-200">
+                <thead class="bg-slate-100 text-[#433364] font-black uppercase tracking-wider">
+                  <tr>
+                    <th class="px-4 py-3">Usuario</th>
+                    <th class="px-4 py-3">Nombre Completo</th>
+                    <th class="px-4 py-3">Rol / Nivel</th>
+                    <th class="px-4 py-3">Contraseña</th>
+                    <th class="px-4 py-3">Estado</th>
+                    <th class="px-4 py-3 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTableBody" class="divide-y divide-slate-200 bg-white font-medium">
+                  <!-- Render dinámico -->
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- MODALES DE ACCIÓN -->
+  <!-- ========================================================================= -->
+
+  <!-- 1. MODAL VISUALIZADOR DE COMPROBANTE -->
+  <div id="receiptModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm hidden fade-in">
+    <div class="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+      <div class="px-6 py-4 won-header-gradient text-white flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span id="modalDocBadge" class="px-3 py-0.5 rounded-full text-xs font-black bg-[#de4f5f] text-white">FACTURA</span>
+          <h3 id="modalTitle" class="text-sm font-bold truncate text-white">Comprobante de Gasto</h3>
+        </div>
+        <button id="btnCloseModal" type="button" class="p-1 rounded-lg text-slate-300 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-auto p-4 bg-slate-100 flex items-center justify-center min-h-[250px]">
+        <img id="modalReceiptImg" src="" alt="Comprobante ampliado" class="max-h-[55vh] max-w-full rounded-2xl shadow-md border border-slate-200 object-contain">
+      </div>
+
+      <div id="modalDetails" class="p-4 bg-white border-t border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+        <div><span class="text-slate-500 font-bold block">Empleado:</span><span id="modalEmployee" class="font-black text-slate-900"></span></div>
+        <div><span class="text-slate-500 font-bold block">Fecha:</span><span id="modalDate" class="font-black text-slate-900"></span></div>
+        <div><span class="text-slate-500 font-bold block">Importe Original:</span><span id="modalOriginal" class="font-black text-slate-900"></span></div>
+        <div><span class="text-slate-500 font-bold block">Total en EUR (€):</span><span id="modalEUR" class="font-black text-[#de4f5f] text-sm"></span></div>
+      </div>
+
+      <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+        <span id="modalIvaInfo" class="text-xs text-slate-700 font-bold"></span>
+        <div class="flex gap-2">
+          <a id="btnDownloadReceiptImg" href="#" download="comprobante.jpg" class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-black text-[#433364] bg-white border border-slate-300 rounded-full hover:bg-slate-100 transition">
+            <i data-lucide="download" class="w-4 h-4"></i> Descargar Foto
+          </a>
+          <button id="btnCloseModal2" type="button" class="px-4 py-2 text-xs font-black text-white bg-slate-900 rounded-full hover:bg-slate-800 transition">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. MODAL RECHAZO (JEFE) -->
+  <div id="rejectModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm hidden fade-in">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200">
+      <div class="flex items-center gap-3 text-[#de4f5f]">
+        <div class="p-2.5 bg-rose-50 rounded-2xl"><i data-lucide="alert-triangle" class="w-6 h-6"></i></div>
+        <div>
+          <h3 class="font-black text-base text-slate-900">Rechazar Comprobante de Gasto</h3>
+          <p class="text-xs text-slate-600">Indica el motivo para notificar al empleado</p>
+        </div>
+      </div>
+      <input type="hidden" id="rejectExpenseId" value="">
+      <div>
+        <label for="rejectionReasonInput" class="block text-xs font-black text-slate-800 mb-1">Motivo del rechazo <span class="text-[#de4f5f]">*</span></label>
+        <textarea id="rejectionReasonInput" rows="3" required placeholder="Ej. Falta adjuntar la factura fiscal con CIF de la empresa..." class="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#de4f5f] font-medium"></textarea>
+      </div>
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button type="button" id="btnCancelReject" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-full">Cancelar</button>
+        <button type="button" id="btnConfirmReject" class="px-5 py-2 text-xs font-black text-white bg-[#de4f5f] hover:bg-[#c93b4c] rounded-full transition flex items-center gap-1.5 shadow-sm">
+          <i data-lucide="x-circle" class="w-4 h-4"></i> Confirmar Rechazo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. MODAL CONFIRMAR PAGO (FINANZAS) -->
+  <div id="paymentModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm hidden fade-in">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200">
+      <div class="flex items-center gap-3 text-emerald-700">
+        <div class="p-2.5 bg-emerald-50 rounded-2xl"><i data-lucide="credit-card" class="w-6 h-6"></i></div>
+        <div>
+          <h3 class="font-black text-base text-slate-900">Registrar Liquidación de Pago</h3>
+          <p class="text-xs text-slate-600">The Wonderfield Group • Reembolsos</p>
+        </div>
+      </div>
+      <input type="hidden" id="payExpenseId" value="">
+      <div class="p-3.5 bg-slate-50 rounded-2xl text-xs space-y-1.5 border border-slate-200">
+        <div class="flex justify-between"><span class="text-slate-600 font-bold">Empleado:</span><span id="payModalEmployee" class="font-black text-slate-900"></span></div>
+        <div class="flex justify-between"><span class="text-slate-600 font-bold">Monto a Liquidar:</span><span id="payModalEUR" class="font-black text-emerald-700 text-sm"></span></div>
+      </div>
+      <div>
+        <label for="paymentRefInput" class="block text-xs font-black text-slate-800 mb-1">Referencia Bancaria / Comprobante</label>
+        <input type="text" id="paymentRefInput" placeholder="Ej. TRANSF-948102" class="w-full px-3.5 py-2 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-600 font-bold">
+      </div>
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button type="button" id="btnCancelPayment" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-full">Cancelar</button>
+        <button type="button" id="btnConfirmPayment" class="px-5 py-2 text-xs font-black text-white bg-emerald-700 hover:bg-emerald-800 rounded-full transition flex items-center gap-1.5 shadow-sm">
+          <i data-lucide="check-circle-2" class="w-4 h-4"></i> Confirmar Pago
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. MODAL CREAR/EDITAR AREA MANAGER (ADMIN) -->
+  <div id="areaManagerModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm hidden fade-in">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-slate-200">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+        <div class="flex items-center gap-2 text-[#433364]">
+          <i data-lucide="user-check" class="w-5 h-5"></i>
+          <h3 id="amModalTitle" class="font-black text-base text-slate-900">Configurar Area Manager</h3>
+        </div>
+        <button id="btnCloseAmModal" type="button" class="p-1 rounded-lg text-slate-500 hover:text-slate-900">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="areaManagerForm" class="space-y-3.5">
+        <input type="hidden" id="amId" value="">
+
+        <div>
+          <label for="amNameInput" class="block text-xs font-black text-slate-800 mb-1">
+            Nombre del Area Manager / Empleado <span class="text-[#de4f5f]">*</span>
+          </label>
+          <input type="text" id="amNameInput" required placeholder="Ej. Carlos Mendoza" class="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#433364] font-medium">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="amRegionInput" class="block text-xs font-black text-slate-800 mb-1">Región / Marca</label>
+            <input type="text" id="amRegionInput" placeholder="Ej. Europa Norte / Taiko" class="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#433364] font-medium">
+          </div>
+          <div>
+            <label for="amEmailInput" class="block text-xs font-black text-slate-800 mb-1">Correo del Empleado</label>
+            <input type="email" id="amEmailInput" placeholder="carlos.mendoza@wonderfieldgroup.com" class="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#433364] font-medium">
+          </div>
+        </div>
+
+        <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+          <span class="text-xs font-black text-[#433364] flex items-center gap-1.5">
+            <i data-lucide="mail" class="w-4 h-4 text-[#de4f5f]"></i> Datos del Jefe Directo para Alertas por Correo
+          </span>
+
+          <div>
+            <label for="amBossInput" class="block text-[11px] font-black text-slate-800 mb-1">
+              Nombre del Jefe Directo <span class="text-[#de4f5f]">*</span>
+            </label>
+            <input type="text" id="amBossInput" required placeholder="Ej. Director Roberto Gómez" class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#433364] font-medium">
+          </div>
+
+          <div>
+            <label for="amBossEmailInput" class="block text-[11px] font-black text-slate-800 mb-1">
+              Correo del Jefe Directo <span class="text-[#de4f5f]">*</span>
+            </label>
+            <input type="email" id="amBossEmailInput" required placeholder="roberto.gomez@wonderfieldgroup.com" class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#433364] font-medium">
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+          <button type="button" id="btnCancelAmModal" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-full">Cancelar</button>
+          <button type="submit" class="px-5 py-2 text-xs font-black text-white bg-[#433364] hover:bg-[#2f2347] rounded-full transition flex items-center gap-1.5 shadow-sm">
+            <i data-lucide="save" class="w-4 h-4 text-[#f5cd33]"></i> Guardar Area Manager
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 5. MODAL CREAR/EDITAR USUARIO (ADMIN) -->
+  <div id="userModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm hidden fade-in">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+        <div class="flex items-center gap-2 text-[#433364]">
+          <i data-lucide="user-plus" class="w-5 h-5"></i>
+          <h3 id="userModalTitle" class="font-black text-base text-slate-900">Crear Nuevo Usuario</h3>
+        </div>
+        <button id="btnCloseUserModal" type="button" class="p-1 rounded-lg text-slate-500 hover:text-slate-900">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="userForm" class="space-y-3.5">
+        <input type="hidden" id="usrId" value="">
+
+        <div>
+          <label for="usrUsernameInput" class="block text-xs font-black text-slate-800 mb-1">
+            Nombre de Usuario <span class="text-[#de4f5f]">*</span>
+          </label>
+          <input type="text" id="usrUsernameInput" required placeholder="ej. r_gomez" class="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#433364] font-medium">
+        </div>
+
+        <div>
+          <label for="usrNameInput" class="block text-xs font-black text-slate-800 mb-1">
+            Nombre Completo / Cargo <span class="text-[#de4f5f]">*</span>
+          </label>
+          <input type="text" id="usrNameInput" required placeholder="ej. Director Roberto Gómez" class="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#433364] font-medium">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="usrRoleSelect" class="block text-xs font-black text-slate-800 mb-1">Rol en el Sistema <span class="text-[#de4f5f]">*</span></label>
+            <select id="usrRoleSelect" required class="w-full px-3 py-2 text-xs font-bold text-[#433364] bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#433364]">
+              <option value="manager">👔 Jefe Directo</option>
+              <option value="finance">💼 Finanzas & Pagos</option>
+              <option value="admin">⚙️ Administrador</option>
+              <option value="employee">✈️ Empleado / Area Mgr</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="usrStatusSelect" class="block text-xs font-black text-slate-800 mb-1">Estado</label>
+            <select id="usrStatusSelect" class="w-full px-3 py-2 text-xs font-bold bg-white border border-slate-300 rounded-xl">
+              <option value="ACTIVE">Activo</option>
+              <option value="INACTIVE">Inactivo</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label for="usrPasswordInput" class="block text-xs font-black text-slate-800 mb-1">
+            Contraseña de Acceso <span class="text-[#de4f5f]">*</span>
+          </label>
+          <div class="relative">
+            <input type="text" id="usrPasswordInput" required placeholder="Mínimo 4 caracteres" class="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#433364] font-mono font-bold">
+            <button type="button" id="btnGenPassword" class="absolute inset-y-0 right-0 pr-3 flex items-center text-xs font-black text-[#de4f5f] hover:text-red-700">
+              Generar
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+          <button type="button" id="btnCancelUserModal" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-full">Cancelar</button>
+          <button type="submit" class="px-5 py-2 text-xs font-black text-white bg-[#433364] hover:bg-[#2f2347] rounded-full transition flex items-center gap-1.5 shadow-sm">
+            <i data-lucide="check" class="w-4 h-4 text-[#f5cd33]"></i> Guardar Usuario
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 6. MODAL SIMULACIÓN NOTIFICACIÓN EMAIL -->
+  <div id="emailPreviewModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm hidden fade-in">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-slate-200">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+        <div class="flex items-center gap-2 text-[#433364]">
+          <i data-lucide="mail-check" class="w-5 h-5 text-[#de4f5f]"></i>
+          <h3 class="font-black text-base text-slate-900">Wonderfield • Notificación por Correo</h3>
+        </div>
+        <button id="btnCloseEmailPreview" type="button" class="p-1 rounded-lg text-slate-500 hover:text-slate-900">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs space-y-2.5">
+        <div class="flex items-center gap-2">
+          <span class="text-slate-600 font-bold w-16">Para:</span>
+          <span id="previewEmailTo" class="font-mono font-black text-[#433364] bg-white px-3 py-1 rounded-full border border-slate-300"></span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-slate-600 font-bold w-16">Asunto:</span>
+          <span id="previewEmailSubject" class="font-bold text-slate-900"></span>
+        </div>
+        <div class="pt-2 border-t border-slate-200">
+          <div id="previewEmailBody" class="p-3.5 bg-white rounded-xl border border-slate-200 text-slate-900 leading-relaxed font-sans whitespace-pre-line font-medium"></div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between pt-1">
+        <span class="text-[11px] text-slate-600 flex items-center gap-1 font-bold">
+          <i data-lucide="info" class="w-3.5 h-3.5 text-[#de4f5f]"></i> Integrado para Outlook, Gmail & Webhooks
+        </span>
+        <a id="btnSendRealMailto" href="#" class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-black text-white bg-[#433364] hover:bg-[#2f2347] rounded-full transition shadow-sm">
+          <i data-lucide="send" class="w-4 h-4 text-[#f5cd33]"></i> Abrir Gestor de Correo
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER WONDERFIELD -->
+  <footer class="mt-auto py-6 bg-white border-t border-slate-200 text-center text-xs text-slate-600 no-print">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <img src="img/logo.png" alt="Wonderfield" class="h-6 w-auto object-contain" onerror="this.style.display='none'">
+        <span class="font-black text-slate-900">WONDERFIELD GROUP</span>
+      </div>
+      <div>
+        <span class="font-medium">© 2026 The Wonderfield Group • Travel & Expense Management</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none"></div>
+
+  <!-- SCRIPTS -->
+  <script src="js/services/exchangeRates.js"></script>
+  <script src="js/services/auth.js"></script>
+  <script src="js/services/db.js"></script>
+  <script src="js/services/excelExport.js"></script>
+  <script src="js/services/mockData.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
