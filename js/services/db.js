@@ -1,0 +1,98 @@
+/* Persistencia de gastos en Supabase: Postgres para metadatos y Storage privado para comprobantes. */
+class DatabaseService {
+  constructor() { this.client = window.supabaseClient; this.readyPromise = Promise.resolve(this.client); }
+  async ensureDb() { return this.readyPromise; }
+
+  async getAll() {
+    const { data, error } = await this.client.from('expenses').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    return Promise.all((data || []).map(row => this.toAppExpense(row)));
+  }
+  async getById(id) {
+    const { data, error } = await this.client.from('expenses').select('*').eq('id', id).single();
+    if (error) throw error;
+    return this.toAppExpense(data);
+  }
+  async add(expense) {
+    const user = await this.currentUser();
+    const id = crypto.randomUUID();
+    const receipt = await this.uploadReceipt(expense.receiptImage, id, user.id);
+    const row = this.toDbExpense({ ...expense, id, employeeId: user.id, employee: user.full_name || expense.employee, status: 'PENDING' }, receipt);
+    const { data, error } = await this.client.from('expenses').insert(row).select().single();
+    if (error) throw error;
+    return this.toAppExpense(data);
+  }
+  async update(expense) {
+    const current = await this.getById(expense.id);
+    const user = await this.currentUser();
+    let receipt = current.receiptPath ? { path: current.receiptPath, name: current.receiptName, mimeType: current.receiptMimeType } : null;
+    if (expense.receiptImage && expense.receiptImage !== current.receiptImage) receipt = await this.uploadReceipt(expense.receiptImage, expense.id, user.id);
+    const row = this.toDbExpense({ ...current, ...expense, employeeId: current.employeeId, status: 'PENDING' }, receipt);
+    const { data, error } = await this.client.from('expenses').update(row).eq('id', expense.id).select().single();
+    if (error) throw error;
+    return this.toAppExpense(data);
+  }
+  async approve(id) { const { data, error } = await this.client.rpc('approve_expense', { expense_id: id }); if (error) throw error; return this.toAppExpense(data); }
+  async reject(id, reason) { const { data, error } = await this.client.rpc('reject_expense', { expense_id: id, reason }); if (error) throw error; return this.toAppExpense(data); }
+  async markAsPaid(id, _financeName, paymentRef = '') { const { data, error } = await this.client.rpc('mark_expense_paid', { expense_id: id, reference: paymentRef }); if (error) throw error; return this.toAppExpense(data); }
+  async delete(id) {
+    const expense = await this.getById(id);
+    if (expense.receiptPath) {
+      const { error: storageError } = await this.client.storage.from('receipts').remove([expense.receiptPath]);
+      if (storageError) throw storageError;
+    }
+    const { error } = await this.client.from('expenses').delete().eq('id', id);
+    if (error) throw error;
+    return true;
+  }
+  async clear() { throw new Error('La limpieza global no está disponible en producción.'); }
+  async currentUser() {
+    const profile = window.authService?.getCurrentProfile();
+    if (!profile || profile.status !== 'ACTIVE') throw new Error('Tu sesión no está autorizada para registrar gastos.');
+    return profile;
+  }
+
+  async uploadReceipt(dataUrl, expenseId, userId) {
+    if (!dataUrl) return null;
+    const blob = await this.validateReceipt(dataUrl);
+    const extension = blob.type === 'application/pdf' ? 'pdf' : blob.type === 'image/png' ? 'png' : 'jpg';
+    const path = `${userId}/${expenseId}/comprobante.${extension}`;
+    const { error } = await this.client.storage.from('receipts').upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: true });
+    if (error) throw error;
+    return { path, name: `comprobante.${extension}`, mimeType: blob.type || 'image/jpeg' };
+  }
+  async toAppExpense(row) {
+    let receiptImage = null;
+    if (row.receipt_path) { const { data } = await this.client.storage.from('receipts').createSignedUrl(row.receipt_path, 300); receiptImage = data?.signedUrl || null; }
+    return { id: row.id, employeeId: row.employee_id, employee: row.employee, date: row.date, trip: row.trip, reason: row.reason,
+      category: row.category, docType: row.doc_type, currency: row.currency, originalAmount: Number(row.original_amount),
+      rateToEUR: Number(row.rate_to_eur), amountEUR: Number(row.amount_eur), hasIva: row.has_iva, ivaRate: Number(row.iva_rate),
+      baseEUR: Number(row.base_eur), ivaEUR: Number(row.iva_eur), status: row.status, receiptImage, receiptPath: row.receipt_path,
+      receiptName: row.receipt_name, receiptMimeType: row.receipt_mime_type, notes: row.notes, approvedAt: row.approved_at,
+      rejectedAt: row.status === 'REJECTED' ? row.approved_at : null, rejectionReason: row.rejection_reason,
+      paidAt: row.paid_at, paymentRef: row.payment_ref, createdAt: row.created_at, updatedAt: row.updated_at };
+  }
+  toDbExpense(expense, receipt) {
+    return { id: expense.id, employee_id: expense.employeeId, employee: expense.employee, date: expense.date, trip: expense.trip || 'General',
+      reason: expense.reason, category: expense.category, doc_type: expense.docType, currency: expense.currency,
+      original_amount: expense.originalAmount, rate_to_eur: expense.rateToEUR, amount_eur: expense.amountEUR,
+      has_iva: Boolean(expense.hasIva), iva_rate: expense.ivaRate || 0, base_eur: expense.baseEUR || 0, iva_eur: expense.ivaEUR || 0,
+      status: expense.status || 'PENDING', receipt_path: receipt?.path || null, receipt_name: receipt?.name || null,
+      receipt_mime_type: receipt?.mimeType || null, notes: expense.notes || null };
+  }
+
+  async validateReceipt(dataUrl) {
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+    if (blob.size === 0 || blob.size > 2 * 1024 * 1024) throw new Error('El comprobante debe tener entre 1 byte y 2 MB.');
+    const header = new Uint8Array(await blob.slice(0, 8).arrayBuffer());
+    const startsWith = (...bytes) => bytes.every((byte, index) => header[index] === byte);
+    const isJpeg = startsWith(0xff, 0xd8, 0xff);
+    const isPng = startsWith(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
+    const isPdf = startsWith(0x25, 0x50, 0x44, 0x46, 0x2d);
+    if (!isJpeg && !isPng && !isPdf) throw new Error('Formato no permitido. Adjunta una imagen JPEG/PNG o un PDF válido.');
+    const mimeType = isPdf ? 'application/pdf' : isPng ? 'image/png' : 'image/jpeg';
+    return new Blob([blob], { type: mimeType });
+  }
+}
+window.databaseService = new DatabaseService();
