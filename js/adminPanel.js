@@ -69,3 +69,59 @@
     setTimeout(showMandatoryPasswordChange, 1000);
   });
 })();
+
+
+/* Hotfix: el gestor se enlaza después del render heredado y muestra errores visibles. */
+(() => {
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' })[c]);
+  const passwordOk = (v) => v.length >= 14 && /[a-z]/.test(v) && /[A-Z]/.test(v) && /[0-9]/.test(v) && /[^A-Za-z0-9]/.test(v);
+  const labels = { employee: 'Area Manager', manager: 'Jefe Directo', finance: 'Finanzas', admin: 'Administrador' };
+  let users = [];
+
+  function notice(text, error = false) {
+    const box = document.getElementById('adminUsersNotice');
+    if (!box) return;
+    box.textContent = text;
+    box.className = 'p-3 rounded-xl text-xs font-bold border ' + (error ? 'bg-rose-50 text-[#de4f5f] border-rose-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200');
+  }
+
+  function table() {
+    const section = document.getElementById('admSectionUsers');
+    if (!section) return;
+    section.innerHTML = '<div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4"><div class="flex flex-col sm:flex-row justify-between gap-3"><div><h3 class="text-base font-black text-slate-900">Cuentas de Acceso Wonderfield</h3><p class="text-xs text-slate-600">Altas, roles, estado y restablecimientos. Las contraseñas nunca se muestran.</p></div><button id="createAdminUser" class="px-4 py-2 rounded-full text-xs font-black text-white bg-[#433364]">+ Crear usuario</button></div><div id="adminUsersNotice" class="p-3 rounded-xl text-xs font-bold border bg-slate-50 text-slate-600 border-slate-200">Cargando cuentas autorizadas…</div><div class="overflow-x-auto"><table class="min-w-full text-left text-xs divide-y divide-slate-200"><thead class="bg-slate-100 text-[#433364] font-black uppercase"><tr><th class="px-3 py-3">Usuario</th><th class="px-3 py-3">Rol</th><th class="px-3 py-3">Región</th><th class="px-3 py-3">Estado</th><th class="px-3 py-3">Seguridad</th><th class="px-3 py-3"></th></tr></thead><tbody id="adminUsersBody" class="divide-y divide-slate-200"></tbody></table></div></div><div id="adminUserModalRoot"></div>';
+    document.getElementById('createAdminUser').onclick = () => modal();
+  }
+
+  function draw() {
+    const body = document.getElementById('adminUsersBody');
+    if (!body) return;
+    body.innerHTML = users.map(u => '<tr><td class="px-3 py-3"><strong>@' + esc(u.username || u.email) + '</strong><div class="text-slate-500">' + esc(u.full_name) + '<br>' + esc(u.email) + '</div></td><td class="px-3 py-3 font-bold">' + esc(labels[u.role] || u.role) + '</td><td class="px-3 py-3">' + esc(u.region || '—') + '</td><td class="px-3 py-3"><span class="font-bold ' + (u.active ? 'text-emerald-700' : 'text-slate-500') + '">' + (u.active ? 'Activo' : 'Inactivo') + '</span></td><td class="px-3 py-3">' + (u.must_change_password ? '<span class="text-amber-700 font-bold">Cambio pendiente</span>' : '<span class="text-emerald-700 font-bold">Vigente</span>') + '</td><td class="px-3 py-3 whitespace-nowrap">' + (u.role === 'admin' ? '<span class="text-slate-500">Protegida</span>' : '<button data-edit="' + esc(u.id) + '" class="text-[#433364] font-black mr-3">Editar</button><button data-toggle="' + esc(u.id) + '" class="text-[#433364] font-black mr-3">' + (u.active ? 'Desactivar' : 'Activar') + '</button><button data-reset="' + esc(u.id) + '" class="text-[#de4f5f] font-black">Restablecer</button>') + '</td></tr>').join('');
+    body.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => modal(users.find(u => u.id === b.dataset.edit)));
+    body.querySelectorAll('[data-toggle]').forEach(b => b.onclick = async () => { const u = users.find(x => x.id === b.dataset.toggle); try { await window.adminUserService.update(u.id, { active: !u.active }); await refresh(); } catch (e) { notice(e.message || 'No se pudo actualizar la cuenta.', true); } });
+    body.querySelectorAll('[data-reset]').forEach(b => b.onclick = async () => { const p = prompt('Nueva contraseña temporal (14+ caracteres, mayúscula, minúscula, número y símbolo):'); if (p === null) return; if (!passwordOk(p)) return notice('La contraseña temporal no cumple la política de seguridad.', true); try { await window.adminUserService.resetPassword(b.dataset.reset, p); await refresh(); notice('Contraseña restablecida. Entrégala por un canal seguro.'); } catch (e) { notice(e.message || 'No se pudo restablecer la contraseña.', true); } });
+  }
+
+  function modal(user) {
+    const root = document.getElementById('adminUserModalRoot');
+    const edit = Boolean(user);
+    root.innerHTML = '<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80"><form id="adminUserFixForm" class="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl"><div><h3 class="font-black text-lg text-slate-900">' + (edit ? 'Editar cuenta' : 'Crear cuenta de acceso') + '</h3><p class="text-xs text-slate-600 mt-1">No se almacenan ni muestran contraseñas existentes.</p></div><div class="grid grid-cols-2 gap-3"><label class="text-xs font-black">Nombre completo<input id="fixName" required value="' + esc(user?.full_name) + '" class="mt-1 w-full px-3 py-2 border rounded-xl"></label><label class="text-xs font-black">Usuario<input id="fixUser" required value="' + esc(user?.username) + '" class="mt-1 w-full px-3 py-2 border rounded-xl"></label></div>' + (edit ? '<div class="text-xs text-slate-600 p-3 bg-slate-50 rounded-xl">Correo: <strong>' + esc(user.email) + '</strong></div>' : '<label class="text-xs font-black block">Correo corporativo<input id="fixEmail" type="email" required class="mt-1 w-full px-3 py-2 border rounded-xl" placeholder="nombre@wonderfieldgroup.com"></label>') + '<div class="grid grid-cols-2 gap-3"><label class="text-xs font-black">Rol<select id="fixRole" class="mt-1 w-full px-3 py-2 border rounded-xl"><option value="employee"' + (user?.role === 'employee' ? ' selected' : '') + '>Area Manager</option><option value="manager"' + (user?.role === 'manager' ? ' selected' : '') + '>Jefe Directo</option><option value="finance"' + (user?.role === 'finance' ? ' selected' : '') + '>Finanzas</option></select></label><label class="text-xs font-black">Región / marca<input id="fixRegion" value="' + esc(user?.region) + '" class="mt-1 w-full px-3 py-2 border rounded-xl"></label></div>' + (edit ? '<label class="flex gap-2 items-center text-xs font-bold"><input id="fixActive" type="checkbox"' + (user.active ? ' checked' : '') + '> Cuenta activa</label>' : '<label class="text-xs font-black block">Contraseña temporal<input id="fixPassword" type="password" required autocomplete="new-password" class="mt-1 w-full px-3 py-2 border rounded-xl" placeholder="14+ caracteres, mayúscula, minúscula, número y símbolo"></label>') + '<div class="flex justify-end gap-2 pt-2"><button type="button" id="closeFixModal" class="px-4 py-2 text-xs font-bold">Cancelar</button><button class="px-5 py-2 rounded-full text-xs font-black text-white bg-[#433364]">' + (edit ? 'Guardar cambios' : 'Crear cuenta') + '</button></div></form></div>';
+    document.getElementById('closeFixModal').onclick = () => root.innerHTML = '';
+    document.getElementById('adminUserFixForm').onsubmit = async e => { e.preventDefault(); const payload = { full_name: document.getElementById('fixName').value.trim(), username: document.getElementById('fixUser').value.trim(), role: document.getElementById('fixRole').value, region: document.getElementById('fixRegion').value.trim() }; try { if (edit) { payload.active = document.getElementById('fixActive').checked; await window.adminUserService.update(user.id, payload); } else { const p = document.getElementById('fixPassword').value; if (!passwordOk(p)) throw new Error('La contraseña temporal no cumple la política de seguridad.'); payload.email = document.getElementById('fixEmail').value.trim(); payload.temporary_password = p; await window.adminUserService.create(payload); } root.innerHTML = ''; await refresh(); notice(edit ? 'Cuenta actualizada.' : 'Cuenta creada. Entrega la contraseña temporal por un canal seguro.'); } catch (err) { notice(err.message || 'No se pudo guardar la cuenta.', true); } };
+  }
+
+  async function refresh() {
+    table();
+    try {
+      if (!window.adminUserService) throw new Error('El módulo seguro de administración no se cargó. Actualiza la página e inténtalo de nuevo.');
+      users = await window.adminUserService.list();
+      draw();
+      notice(users.length ? 'Cuentas cargadas correctamente.' : 'No hay cuentas adicionales.');
+    } catch (err) { notice(err.message || 'No se pudieron cargar las cuentas.', true); }
+  }
+
+  function boot() {
+    const tab = document.getElementById('admSubTabUsers');
+    if (tab) tab.addEventListener('click', () => setTimeout(refresh, 0), true);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
