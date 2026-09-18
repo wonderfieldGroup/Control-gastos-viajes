@@ -30,6 +30,7 @@ class AuthService {
         return {
           id: row.id, username: row.username || row.email, name: row.full_name, full_name: row.full_name,
           email: row.email, role: row.role, status: row.active ? 'ACTIVE' : 'INACTIVE',
+          mustChangePassword: Boolean(row.must_change_password),
           region: row.region || 'General', directBoss: boss?.full_name || '', bossEmail: boss?.email || '',
           directBossId: row.direct_boss_id, notes: row.notes || ''
         };
@@ -77,7 +78,8 @@ class AuthService {
   toAppProfile(row) {
     const boss = this.directory.find(profile => profile.id === row.direct_boss_id);
     return { id: row.id, username: row.username || row.email, name: row.full_name, full_name: row.full_name, email: row.email,
-      role: row.role, status: row.active ? 'ACTIVE' : 'INACTIVE', region: row.region || 'General', directBoss: boss?.name || '',
+      role: row.role, status: row.active ? 'ACTIVE' : 'INACTIVE', mustChangePassword: Boolean(row.must_change_password),
+      region: row.region || 'General', directBoss: boss?.name || '',
       bossEmail: boss?.email || '', directBossId: row.direct_boss_id, notes: row.notes || '' };
   }
 }
