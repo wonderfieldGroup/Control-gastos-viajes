@@ -121,7 +121,7 @@
 
   function boot() {
     const tab = document.getElementById('admSubTabUsers');
-    if (tab) tab.addEventListener('click', () => setTimeout(refresh, 0), true);
+    if (tab) tab.addEventListener('click', () => setTimeout(refresh, 25), true);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
