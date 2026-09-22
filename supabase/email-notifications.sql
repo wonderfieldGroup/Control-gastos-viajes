@@ -2,10 +2,6 @@
 begin;
 create extension if not exists pg_net with schema extensions;
 create extension if not exists pg_cron;
-revoke all on schema net from public,anon,authenticated;
-revoke all on all tables in schema net from public,anon,authenticated;
-revoke all on all sequences in schema net from public,anon,authenticated;
-revoke all on all functions in schema net from public,anon,authenticated;
 create schema notification_private;
 revoke all on schema notification_private from public, anon, authenticated;
 create table notification_private.settings (
