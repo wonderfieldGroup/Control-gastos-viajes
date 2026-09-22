@@ -80,7 +80,7 @@
       </div>
 
       <!-- BARRA DE PESTAÑAS WONDERFIELD (4 PESTAÑAS) -->
-      <div class="flex items-center gap-1 sm:gap-2 -mb-px border-t border-slate-200 pt-1 overflow-x-auto">
+      <div class="hidden flex items-center gap-1 sm:gap-2 -mb-px border-t border-slate-200 pt-1 overflow-x-auto" aria-hidden="true">
         
         <!-- PESTAÑA 1: AREA MANAGER (ACCESO POR CORREO) -->
         <button id="navTabEmployee" type="button" class="main-tab active flex items-center gap-2 py-2.5 px-4 text-xs sm:text-sm font-black border-b-2 border-[#de4f5f] text-[#de4f5f] transition whitespace-nowrap" data-tab="employee">
@@ -140,7 +140,7 @@
     <!-- ======================================================================= -->
     <!-- VISTA 1: AREA MANAGER (ACCESO POR CORREO & GESTIÓN INDIVIDUAL) -->
     <!-- ======================================================================= -->
-    <section id="viewEmployee" class="tab-view space-y-6">
+    <section id="viewEmployee" class="tab-view space-y-6 hidden">
       
       <!-- 1.1 FORMULARIO DE ACCESO SEGURO -->
       <div id="empLoginBox" class="max-w-lg mx-auto bg-white p-7 sm:p-9 rounded-3xl border border-slate-200 shadow-xl space-y-6 my-8">
@@ -1099,6 +1099,7 @@
   <script src="js/services/excelExport.js"></script>
   <script src="js/app.js?v=20260918-production-security"></script>
   <script src="js/services/adminUsers.js"></script>
-  <script src="js/adminPanel.js?v=20260918-admin-users"></script>
+  <script src="js/adminPanel.js?v=20260922-password-policy"></script>
+  <script src="js/unifiedLogin.js?v=20260922-unified-access"></script>
 </body>
 </html>
