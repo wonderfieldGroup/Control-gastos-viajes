@@ -265,8 +265,8 @@ return reply(request, 200, { ok: true });
 }
 
 return reply(request, 400, { error: "Unknown action" });
-} catch (error) {
-console.error("admin-user-management failed", error instanceof Error ? error.message : "unknown error");
+} catch (_error) {
+console.error("admin-user-management failed");
 return reply(request, 500, { error: "No se pudo completar la operación. Revisa los datos e inténtalo de nuevo." });
 }
 });
