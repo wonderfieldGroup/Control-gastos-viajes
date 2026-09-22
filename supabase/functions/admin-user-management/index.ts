@@ -27,6 +27,7 @@ function headers(request) {
 return {
 "Content-Type": "application/json",
 "Vary": "Origin",
+"Cache-Control": "no-store",
 "Access-Control-Allow-Origin": allowedOrigin(request) || "",
 "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -87,6 +88,28 @@ throw new Error("The assigned direct manager must be active");
 return bossId;
 }
 
+
+async function allowLoginAttempt(key, limit) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('portal-login:' + key));
+  const bucket = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+  const { data, error } = await admin.rpc('consume_portal_login_attempt', { p_bucket: bucket, p_limit: limit });
+  return !error && data === true;
+}
+
+async function loginByUsername(request, payload) {
+  const identifier = cleanText(payload.identifier, 60);
+  const failure = { error: 'Usuario o contraseña incorrectos, o demasiados intentos. Inténtalo más tarde.' };
+  if (!/^[A-Za-z0-9._-]{3,60}$/.test(identifier) || typeof payload.password !== 'string' || !payload.password || payload.password.length > 1024) return reply(request, 400, failure);
+  if (!await allowLoginAttempt('global', 200) || !await allowLoginAttempt('user:' + identifier.toLowerCase(), 10)) return reply(request, 429, failure);
+  const username = identifier.toLowerCase() === 'admin' ? 'Admin' : identifier;
+  const { data: profile, error: lookupError } = await admin.from('profiles').select('id,email,active').eq('username', username).maybeSingle();
+  // A separate client avoids ever replacing the privileged client's auth session.
+  const loginClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY'), { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data, error } = await loginClient.auth.signInWithPassword({ email: !lookupError && profile?.active ? profile.email : 'invalid-login@example.invalid', password: payload.password });
+  if (error || !data?.session || !profile?.active || data.user?.id !== profile.id) return reply(request, 401, failure);
+  return reply(request, 200, { session: { access_token: data.session.access_token, refresh_token: data.session.refresh_token } });
+}
+
 Deno.serve(async (request) => {
 if (!allowedOrigin(request)) {
 return new Response(JSON.stringify({ error: "Origin not allowed" }), {
@@ -96,6 +119,17 @@ headers: { "Content-Type": "application/json", "Vary": "Origin" },
 }
 if (request.method === "OPTIONS") return new Response("ok", { headers: headers(request) });
 if (request.method !== "POST") return reply(request, 405, { error: "Method not allowed" });
+
+let payload;
+try { payload = await request.json(); } catch { return reply(request, 400, { error: "Invalid JSON" }); }
+if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+return reply(request, 400, { error: "Invalid request" });
+}
+
+if (payload.action === 'login') {
+  try { return await loginByUsername(request, payload); }
+  catch { return reply(request, 503, { error: 'No se pudo iniciar sesión. Inténtalo más tarde.' }); }
+}
 
 const authorization = request.headers.get("authorization") || "";
 if (!authorization.startsWith("Bearer ")) return reply(request, 401, { error: "Authentication required" });
@@ -110,7 +144,7 @@ user.email?.toLowerCase() === "admin@wonderfieldgroup.com" &&
 Boolean(user.email_confirmed_at);
 
 const { data: actor, error: actorError } = await admin.from("profiles")
-.select("id, role, active")
+.select("id, role, active, direct_boss_id")
 .eq("id", user.id)
 .maybeSingle();
 
@@ -123,14 +157,16 @@ return reply(request, 403, { error: "Account not authorized" });
 
 const actorId = actor?.id ?? user.id;
 
-let payload;
-try { payload = await request.json(); } catch { return reply(request, 400, { error: "Invalid JSON" }); }
-if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-return reply(request, 400, { error: "Invalid request" });
-}
-
 const action = payload.action;
 try {
+if (action === 'get_my_manager') {
+  if (!actor?.active) return reply(request, 403, { error: 'Account not authorized' });
+  if (actor.role !== 'employee' || !actor.direct_boss_id) return reply(request, 200, { manager: null });
+  const { data: manager, error: managerError } = await admin.from('profiles').select('id,full_name,email').eq('id', actor.direct_boss_id).eq('active', true).in('role', ['manager', 'admin']).maybeSingle();
+  if (managerError) throw managerError;
+  return reply(request, 200, { manager });
+}
+
 if (action === "change_own_password") {
 if (!validPassword(payload.password)) {
 return reply(request, 400, { error: "La contraseña debe tener al menos 8 caracteres e incluir mayúscula, minúscula, número y símbolo." });

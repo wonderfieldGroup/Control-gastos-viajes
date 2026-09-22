@@ -134,9 +134,8 @@
       const auth = window.authService;
       const client = window.supabaseClient;
       if (!auth || !client) throw new Error('El servicio de acceso no está disponible. Actualiza la página.');
-      const email = identifier.toLowerCase() === 'admin' ? 'admin@wonderfieldgroup.com' : identifier;
-      const { error } = await client.auth.signInWithPassword({ email, password });
-      if (error) throw new Error('Usuario o contraseña incorrectos.');
+      const { error } = await auth.authenticate(identifier, password);
+      if (error) throw new Error('Usuario o contraseña incorrectos, o demasiados intentos. Si persiste, espera cinco minutos.');
       const profile = await auth.loadProfile();
       if (!profile || profile.status !== 'ACTIVE') {
         await auth.logout();
@@ -157,12 +156,15 @@
     document.getElementById(id)?.addEventListener('click', () => setTimeout(() => showUnifiedLogin(), 0));
   });
 
+  window.addEventListener('portal:reauth-required', event => {
+    document.getElementById('mandatoryPasswordModal')?.remove();
+    passwordInput.value = '';
+    showUnifiedLogin(event.detail?.message || 'Inicia sesión de nuevo para continuar.');
+  });
+
   document.addEventListener('DOMContentLoaded', async () => {
-    try { await window.authService?.logout?.(); }
-    finally {
-      showUnifiedLogin();
-      await fillSavedCredentials();
-      if (!passwordInput.value) identifierInput.focus();
-    }
+    showUnifiedLogin();
+    await fillSavedCredentials();
+    if (!passwordInput.value) identifierInput.focus();
   }, { once: true });
 })();

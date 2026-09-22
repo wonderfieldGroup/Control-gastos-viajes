@@ -31,7 +31,19 @@ class AdminUserService {
   async resetPassword(userId, temporaryPassword) {
     return this.request('reset_password', { user_id: userId, temporary_password: temporaryPassword });
   }
-  async changeOwnPassword(password) { return this.request('change_own_password', { password }); }
+  async changeOwnPassword(password) {
+    const email = window.authService?.getCurrentProfile()?.email;
+    if (!email) throw new Error('Tu sesión ha caducado. Inicia sesión de nuevo.');
+    const result = await this.request('change_own_password', { password });
+    // Admin password updates may invalidate the previous session. Obtain a fresh one.
+    const { error } = await this.client.auth.signInWithPassword({ email, password });
+    if (error) {
+      await window.authService.logout();
+      window.dispatchEvent(new CustomEvent('portal:reauth-required', { detail: { message: 'Contraseña actualizada. Inicia sesión con tu contraseña nueva para continuar.' } }));
+      return { ...result, reauthRequired: true };
+    }
+    return result;
+  }
 }
 
 window.adminUserService = new AdminUserService();
