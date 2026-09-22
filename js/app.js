@@ -1103,22 +1103,53 @@ document.addEventListener('DOMContentLoaded', async () => {
     payModalEUR.textContent = item.amountEUR.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
     paymentRefInput.value = 'TRANSF-' + Math.floor(100000 + Math.random() * 900000);
 
+    const previousError = document.getElementById('paymentError');
+    if (previousError) previousError.textContent = '';
     paymentModal.classList.remove('hidden');
   }
 
   btnCancelPayment.addEventListener('click', () => paymentModal.classList.add('hidden'));
 
   btnConfirmPayment.addEventListener('click', async () => {
+    if (btnConfirmPayment.disabled) return;
+    let errorBox = document.getElementById('paymentError');
+    if (!errorBox) {
+      errorBox = document.createElement('p');
+      errorBox.id = 'paymentError';
+      errorBox.setAttribute('role', 'alert');
+      errorBox.className = 'mt-3 text-sm font-bold text-rose-600';
+      paymentRefInput.insertAdjacentElement('afterend', errorBox);
+    }
+    errorBox.textContent = '';
     const id = payExpenseId.value;
     const ref = paymentRefInput.value.trim();
-
-    const user = window.authService.getUser('finance') || { name: 'Lic. Laura Martínez' };
-    await window.databaseService.markAsPaid(id, user.name, ref);
-    paymentModal.classList.add('hidden');
-    showToast('💳 Gasto marcado como pagado exitosamente', 'success');
-
-    if (window.confetti) window.confetti({ particleCount: 40, spread: 60, origin: { y: 0.6 } });
-    await loadAllExpenses();
+    const user = window.authService.getUser('finance');
+    if (!id || !user || user.status !== 'ACTIVE') {
+      errorBox.textContent = 'Tu sesión no está autorizada. Vuelve a iniciar sesión en Finanzas.';
+      return;
+    }
+    if (!ref) {
+      errorBox.textContent = 'Indica la referencia bancaria o del comprobante.';
+      paymentRefInput.focus();
+      return;
+    }
+    const originalLabel = btnConfirmPayment.innerHTML;
+    btnConfirmPayment.disabled = true;
+    btnConfirmPayment.textContent = 'Confirmando pago...';
+    try {
+      await window.databaseService.markAsPaid(id, user.name, ref);
+      paymentModal.classList.add('hidden');
+      showToast('💳 Gasto marcado como pagado exitosamente', 'success');
+      if (window.confetti) window.confetti({ particleCount: 40, spread: 60, origin: { y: 0.6 } });
+      await loadAllExpenses();
+    } catch (error) {
+      console.error('Error al confirmar el pago:', error);
+      errorBox.textContent = 'No se pudo confirmar el pago. ' + (error.message || 'Comprueba tu conexión e inténtalo de nuevo.');
+    } finally {
+      btnConfirmPayment.disabled = false;
+      btnConfirmPayment.innerHTML = originalLabel;
+      if (window.lucide) window.lucide.createIcons();
+    }
   });
 
   // ----------------------------------------------------
