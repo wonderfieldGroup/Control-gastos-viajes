@@ -37,12 +37,27 @@ class AuthService {
       });
       this.profile = this.directory.find(profile => profile.id === this.profile.id) || this.profile;
     }
+    if (this.profile?.role === 'employee' && this.profile.directBossId && !this.profile.directBoss) {
+      const { data: managerData, error: managerError } = await this.client.functions.invoke('admin-user-management', { body: { action: 'get_my_manager' } });
+      if (!managerError && managerData?.manager) {
+        this.profile.directBoss = managerData.manager.full_name || '';
+        this.profile.bossEmail = managerData.manager.email || '';
+      }
+    }
     return this.directory;
+  }
+  async authenticate(identifier, password) {
+    const value = String(identifier || '').trim();
+    if (value.includes('@')) return this.client.auth.signInWithPassword({ email: value, password });
+    const { data, error } = await this.client.functions.invoke('admin-user-management', {
+      body: { action: 'login', identifier: value, password }
+    });
+    if (error || !data?.session) return { error: new Error('Usuario o contraseña incorrectos, o demasiados intentos. Inténtalo más tarde.') };
+    return this.client.auth.setSession(data.session);
   }
   async loginEmployee(email, password) { return this.login('employee', email, password); }
   async login(role, identifier, password) {
-    const email = this.resolveLoginIdentifier(role, identifier);
-    const { error } = await this.client.auth.signInWithPassword({ email, password });
+    const { error } = await this.authenticate(identifier, password);
     if (error) return { success: false, message: 'Usuario o contraseña incorrectos.' };
     let profile;
     try { profile = await this.loadProfile(); }
