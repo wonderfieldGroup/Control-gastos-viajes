@@ -603,7 +603,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Autoasignar nombre en formulario
     employeeInput.value = currentEmp.name;
-    detectedBossInfo.textContent = `👔 Jefe Directo Notificado: ${currentEmp.directBoss} (${currentEmp.bossEmail})`;
+    detectedBossInfo.textContent = `👔 Jefe Directo asignado: ${currentEmp.directBoss} (${currentEmp.bossEmail})`;
 
     // FILTRAR ESTRICTAMENTE SOLO LOS GASTOS DE ESTE AREA MANAGER
     const myExpenses = expenses.filter(e => {
@@ -1457,7 +1457,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Comprobar si tiene jefe directo asignado en el directorio
         const bossInfo = window.authService.getBossForEmployee(currentEmp.email || currentEmp.name);
         if (bossInfo) {
-          showToast(`🎉 Gasto enviado. ✉️ Alerta emitida a tu Jefe ${bossInfo.directBoss} (${bossInfo.bossEmail})`, 'success');
+          showToast(`🎉 Gasto guardado para revisión de ${bossInfo.directBoss}. Consulta el estado en el portal.`, 'success');
         } else {
           showToast('🎉 Gasto enviado a la bandeja de aprobación del jefe', 'success');
         }
