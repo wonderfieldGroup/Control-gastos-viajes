@@ -27,6 +27,7 @@ class AdminUserService {
   async list() { return (await this.request('list_users')).users || []; }
   async create(payload) { return (await this.request('create_user', payload)).user; }
   async update(userId, payload) { return (await this.request('update_user', { user_id: userId, ...payload })).user; }
+  async delete(userId) { return this.request('delete_user', { user_id: userId }); }
   async resetPassword(userId, temporaryPassword) {
     return this.request('reset_password', { user_id: userId, temporary_password: temporaryPassword });
   }
