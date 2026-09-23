@@ -49,7 +49,7 @@ class AuthService {
   }
   async authenticate(identifier, password) {
     const value = String(identifier || '').trim();
-    if (value.includes('@')) return this.client.auth.signInWithPassword({ email: value, password });
+    if (value.includes('@')) return this.client.auth.signInWithPassword({ email: value.toLowerCase(), password });
     const { data, error } = await this.client.functions.invoke('admin-user-management', {
       body: { action: 'login', identifier: value, password }
     });
