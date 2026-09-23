@@ -76,7 +76,17 @@
           </div>
         </div>
 
-
+        <div class="flex shrink-0 items-center gap-2 ml-2">
+          <label for="languageSelector" class="flex items-center gap-1 text-xs font-bold text-slate-600">
+            <i data-lucide="languages" class="w-4 h-4" aria-hidden="true"></i>
+            <span class="hidden sm:inline">Idioma</span>
+          </label>
+          <select id="languageSelector" aria-label="Idioma" class="rounded-xl border border-slate-300 bg-white px-2 py-2 text-xs font-bold text-[#433364] focus:outline-none focus:ring-2 focus:ring-[#433364]">
+            <option value="es">Español</option>
+            <option value="en">English</option>
+            <option value="it">Italiano</option>
+          </select>
+        </div>
       </div>
 
       <!-- BARRA DE PESTAÑAS WONDERFIELD (4 PESTAÑAS) -->
@@ -1091,6 +1101,7 @@
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none"></div>
 
   <!-- SCRIPTS -->
+  <script src="js/i18n.js?v=20260923-three-languages"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1"></script>
   <script src="js/services/supabase.js"></script>
   <script src="js/services/exchangeRates.js"></script>
