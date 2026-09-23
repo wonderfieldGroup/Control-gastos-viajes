@@ -27,21 +27,22 @@ class AuthService {
       const rows = data || [];
       this.directory = rows.map(row => {
         const boss = rows.find(profile => profile.id === row.direct_boss_id);
+        const secondBoss = rows.find(profile => profile.id === row.secondary_boss_id);
         return {
           id: row.id, username: row.username || row.email, name: row.full_name, full_name: row.full_name,
           email: row.email, role: row.role, status: row.active ? 'ACTIVE' : 'INACTIVE',
           mustChangePassword: Boolean(row.must_change_password),
-          region: row.region || 'General', directBoss: boss?.full_name || '', bossEmail: boss?.email || '',
-          directBossId: row.direct_boss_id, notes: row.notes || ''
+          region: row.region || 'General', directBoss: [boss?.full_name, secondBoss?.full_name].filter(Boolean).join(' y '), bossEmail: [boss?.email, secondBoss?.email].filter(Boolean).join(' / '),
+          directBossId: row.direct_boss_id, secondaryBossId: row.secondary_boss_id, notes: row.notes || ''
         };
       });
       this.profile = this.directory.find(profile => profile.id === this.profile.id) || this.profile;
     }
-    if (this.profile?.role === 'employee' && this.profile.directBossId && !this.profile.directBoss) {
-      const { data: managerData, error: managerError } = await this.client.functions.invoke('admin-user-management', { body: { action: 'get_my_manager' } });
-      if (!managerError && managerData?.manager) {
-        this.profile.directBoss = managerData.manager.full_name || '';
-        this.profile.bossEmail = managerData.manager.email || '';
+    if (this.profile?.role === 'employee' && (this.profile.directBossId || this.profile.secondaryBossId)) {
+      const { data: managerData, error: managerError } = await this.client.functions.invoke('admin-user-management', { body: { action: 'get_my_managers' } });
+      if (!managerError && Array.isArray(managerData?.managers)) {
+        this.profile.directBoss = managerData.managers.map(manager => manager.full_name).join(' y ');
+        this.profile.bossEmail = managerData.managers.map(manager => manager.email).join(' / ');
       }
     }
     return this.directory;
@@ -92,10 +93,11 @@ class AuthService {
   }
   toAppProfile(row) {
     const boss = this.directory.find(profile => profile.id === row.direct_boss_id);
+    const secondBoss = this.directory.find(profile => profile.id === row.secondary_boss_id);
     return { id: row.id, username: row.username || row.email, name: row.full_name, full_name: row.full_name, email: row.email,
       role: row.role, status: row.active ? 'ACTIVE' : 'INACTIVE', mustChangePassword: Boolean(row.must_change_password),
-      region: row.region || 'General', directBoss: boss?.name || '',
-      bossEmail: boss?.email || '', directBossId: row.direct_boss_id, notes: row.notes || '' };
+      region: row.region || 'General', directBoss: [boss?.name, secondBoss?.name].filter(Boolean).join(' y '),
+      bossEmail: [boss?.email, secondBoss?.email].filter(Boolean).join(' / '), directBossId: row.direct_boss_id, secondaryBossId: row.secondary_boss_id, notes: row.notes || '' };
   }
 }
 window.authService = new AuthService();
