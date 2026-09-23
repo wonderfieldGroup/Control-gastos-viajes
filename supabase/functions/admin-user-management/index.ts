@@ -109,8 +109,8 @@ async function loginByUsername(request, payload) {
   const failure = { error: 'Usuario o contraseña incorrectos, o demasiados intentos. Inténtalo más tarde.' };
   if (!/^[A-Za-z0-9._-]{3,60}$/.test(identifier) || typeof payload.password !== 'string' || !payload.password || payload.password.length > 1024) return reply(request, 400, failure);
   if (!await allowLoginAttempt('global', 200) || !await allowLoginAttempt('user:' + identifier.toLowerCase(), 10)) return reply(request, 429, failure);
-  const username = identifier.toLowerCase() === 'admin' ? 'Admin' : identifier;
-  const { data: profile, error: lookupError } = await admin.from('profiles').select('id,email,active').eq('username', username).maybeSingle();
+  const usernameLookup = identifier.toLowerCase();
+  const { data: profile, error: lookupError } = await admin.from('profiles').select('id,email,active').eq('username_lookup', usernameLookup).maybeSingle();
   // A separate client avoids ever replacing the privileged client's auth session.
   const loginClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY'), { auth: { persistSession: false, autoRefreshToken: false } });
   const { data, error } = await loginClient.auth.signInWithPassword({ email: !lookupError && profile?.active ? profile.email : 'invalid-login@example.invalid', password: payload.password });
