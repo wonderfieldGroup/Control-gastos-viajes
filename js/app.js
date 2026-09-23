@@ -543,6 +543,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (currentActiveTab === 'admin') renderAdminDashboard();
   }
 
+  // Todas las sesiones leen el mismo estado de Supabase. Al volver a la pestaña
+  // y cada 15 segundos, se actualizan las bandejas compartidas sin recargar.
+  let refreshingSharedExpenses = false;
+  async function refreshSharedExpenses() {
+    if (document.hidden || refreshingSharedExpenses || !window.authService?.getCurrentProfile?.()) return;
+    refreshingSharedExpenses = true;
+    try { await loadAllExpenses(); }
+    catch (error) { console.error('No se pudo sincronizar la bandeja de gastos:', error); }
+    finally { refreshingSharedExpenses = false; }
+  }
+  window.setInterval(refreshSharedExpenses, 15000);
+  window.addEventListener('focus', refreshSharedExpenses);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshSharedExpenses(); });
+
   function updateHeaderBadges() {
     const pendingCount = expenses.filter(e => e.status === 'PENDING').length;
     const approvedUnpaidCount = expenses.filter(e => e.status === 'APPROVED').length;
@@ -838,11 +852,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('.btn-mgr-approve').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
-        const user = window.authService.getUser('manager') || { name: 'Director Roberto Gómez' };
-        await window.databaseService.approve(id, user.name);
-        showToast('✅ Gasto aprobado y enviado a Finanzas', 'success');
-        if (window.confetti) window.confetti({ particleCount: 35, spread: 50, origin: { y: 0.7 } });
-        await loadAllExpenses();
+        const user = window.authService.getUser('manager');
+        if (!user) return;
+        btn.disabled = true;
+        try {
+          await window.databaseService.approve(id);
+          showToast('✅ Gasto aprobado y enviado a Finanzas', 'success');
+          if (window.confetti) window.confetti({ particleCount: 35, spread: 50, origin: { y: 0.7 } });
+        } catch (error) {
+          showToast(error.message || 'El gasto ya fue gestionado. Se actualizará la bandeja.', 'error');
+        } finally {
+          btn.disabled = false;
+          await loadAllExpenses();
+        }
       });
     });
 
@@ -1084,11 +1106,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    const user = window.authService.getUser('manager') || { name: 'Director Roberto Gómez' };
-    await window.databaseService.reject(id, reason, user.name);
-    rejectModal.classList.add('hidden');
-    showToast('Gasto marcado como rechazado', 'info');
-    await loadAllExpenses();
+    const user = window.authService.getUser('manager');
+    if (!user) return;
+    btnConfirmReject.disabled = true;
+    try {
+      await window.databaseService.reject(id, reason);
+      rejectModal.classList.add('hidden');
+      showToast('Gasto marcado como rechazado', 'info');
+    } catch (error) {
+      showToast(error.message || 'El gasto ya fue gestionado. Se actualizará la bandeja.', 'error');
+    } finally {
+      btnConfirmReject.disabled = false;
+      await loadAllExpenses();
+    }
   });
 
   // ----------------------------------------------------

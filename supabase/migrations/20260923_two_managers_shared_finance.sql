@@ -1,41 +1,18 @@
--- Apply once through Supabase SQL Editor as postgres. No credentials, no backfill.
+-- Asignacion opcional de un segundo jefe, conservando el primero y el historial.
 begin;
-create extension if not exists pg_net with schema extensions;
-create extension if not exists pg_cron;
-create schema notification_private;
-revoke all on schema notification_private from public, anon, authenticated;
-create table notification_private.settings (
- singleton boolean primary key default true check(singleton),
- enabled boolean not null default false,
- from_address text, reply_to text,
- generation uuid not null default gen_random_uuid(),
- updated_at timestamptz not null default now(),
- check(not enabled or coalesce(from_address,'') ~ '^[^[:space:]<>@]+@[^[:space:]<>@]+[.][^[:space:]<>@]+$')
-);
-insert into notification_private.settings(singleton) values(true);
-create table notification_private.outbox (
- id uuid primary key default gen_random_uuid(),
- expense_id uuid not null references public.expenses(id) on delete cascade,
- event_status public.expense_status not null,
- recipient_kind text not null check(recipient_kind in ('employee','manager','finance')),
- recipient_id uuid references public.profiles(id) on delete set null,
- generation uuid not null,
- state text not null check(state in ('suppressed','blocked','queued','sending','accepted','failed','cancelled')),
- created_at timestamptz not null default now(), next_attempt_at timestamptz not null default now(),
- first_attempt_at timestamptz, requested_at timestamptz,
- attempts integer not null default 0 check(attempts between 0 and 6),
- request_id bigint, payload jsonb, provider_id text, accepted_at timestamptz, last_error text,
- unique nulls not distinct(expense_id,event_status,recipient_kind,recipient_id)
-);
-create index notifications_due_idx on notification_private.outbox(next_attempt_at) where state='queued';
-create index notifications_sending_idx on notification_private.outbox(request_id) where state='sending';
-create index notifications_budget_idx on notification_private.outbox(first_attempt_at) where first_attempt_at is not null;
-create index notifications_recipient_idx on notification_private.outbox(recipient_id);
-alter table notification_private.settings enable row level security;
-alter table notification_private.outbox enable row level security;
-revoke all on all tables in schema notification_private from public,anon,authenticated;
--- Internal trigger only; existing expense authorization is unchanged.
-create function notification_private.enqueue_expense()
+alter table public.profiles add column if not exists secondary_boss_id uuid references public.profiles(id) on delete set null;
+alter table public.profiles add constraint profiles_distinct_bosses check (secondary_boss_id is null or (direct_boss_id is not null and secondary_boss_id <> direct_boss_id));
+create index if not exists profiles_secondary_boss_id_idx on public.profiles(secondary_boss_id) where secondary_boss_id is not null;
+create or replace function private.is_direct_manager(profile_id uuid)
+returns boolean language sql stable security definer set search_path='' as $$
+  select private.has_role('manager'::public.app_role) and exists (
+    select 1 from public.profiles p
+    where p.id=profile_id and (p.direct_boss_id=(select auth.uid()) or p.secondary_boss_id=(select auth.uid()))
+  );
+$$;
+-- Se conservan los permisos actuales: ambas jefaturas usan la misma comprobacion,
+-- y todos los perfiles finance activos siguen viendo toda la tabla por RLS.
+create or replace function notification_private.enqueue_expense()
 returns trigger language plpgsql security definer set search_path='' as $$
 declare cfg notification_private.settings; target record; target_state text;
 begin
@@ -65,31 +42,8 @@ begin
  return new;
 end;
 $$;
-revoke all on function notification_private.enqueue_expense() from public,anon,authenticated;
-create trigger expense_email_notifications after insert or update of status on public.expenses
-for each row execute function notification_private.enqueue_expense();
--- Plain text; no receipt attachments, amounts, names or banking details.
-create function notification_private.message_text(p_id uuid,p_status public.expense_status,p_kind text)
-returns text language sql immutable security invoker set search_path='' as $$
-select (case
- when p_kind='manager' then 'Tienes un nuevo gasto pendiente de revisar.'
- when p_kind='finance' then 'Hay un gasto aprobado por el jefe directo pendiente de tramitar el pago.'
- when p_status='PENDING' then 'Tu gasto se ha registrado y esta pendiente de revision por tu jefe directo.'
- when p_status='APPROVED' then 'Tu gasto ha sido aprobado por tu jefe directo y esta pendiente de pago por Finanzas.'
- when p_status='REJECTED' then 'Tu gasto ha sido rechazado. Consulta el motivo en el portal.'
- when p_status='PAID' then 'Finanzas ha marcado tu gasto como pagado. Consulta el detalle en el portal.'
- end)||E'
 
-Solicitud: '||p_id::text||E'
-
-Accede con tu usuario al portal para consultar el estado actual:
-https://control-gastos-viajes.pages.dev/
-
-Aviso automatico del Portal de Control de Gastos de Viajes. Este mensaje no es un comprobante bancario.';
-$$;
-revoke all on function notification_private.message_text(uuid,public.expense_status,text) from public,anon,authenticated;
--- Cron executes as postgres. No public send endpoint or browser-held secret.
-create function notification_private.dispatch_tick()
+create or replace function notification_private.dispatch_tick()
 returns jsonb language plpgsql security invoker set search_path='' as $$
 declare cfg notification_private.settings; job notification_private.outbox; response record;
  recipient record; api_key text; subject_text text; req bigint; response_id text;
@@ -160,22 +114,5 @@ begin
  return '{"state":"submitted","sent":1}'::jsonb;
 end;
 $$;
-revoke all on function notification_private.dispatch_tick() from public,anon,authenticated;
-select cron.schedule('travel-expense-email','* * * * *','select notification_private.dispatch_tick();');
-select cron.alter_job((select jobid from cron.job where jobname='travel-expense-email'),active:=false);
-create function notification_private.settings_changed()
-returns trigger language plpgsql security invoker set search_path='' as $$
-begin
- new.generation:=gen_random_uuid(); new.updated_at:=now();
- if new.reply_to is not null and new.reply_to !~ '^[^[:space:]<>@]+@[^[:space:]<>@]+[.][^[:space:]<>@]+$' then raise exception 'Invalid reply address'; end if;
- update notification_private.outbox set state='cancelled',last_error='configuration_changed' where state='queued';
- perform cron.alter_job((select jobid from cron.job where jobname='travel-expense-email'),active:=new.enabled);
- return new;
-end;
-$$;
-revoke all on function notification_private.settings_changed() from public,anon,authenticated;
-create trigger notification_settings_changed before update on notification_private.settings
-for each row execute function notification_private.settings_changed();
-comment on table notification_private.settings is 'Server-only: set verified from_address and Vault travel_resend_api_key before enabling. No historical backfill.';
-comment on table notification_private.outbox is 'accepted means accepted by Resend, not delivered. Suppressed and blocked notices are not replayed automatically.';
+
 commit;

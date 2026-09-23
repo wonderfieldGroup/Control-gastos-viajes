@@ -57,6 +57,7 @@ role: profile.role,
 active: profile.active,
 region: profile.region,
 direct_boss_id: profile.direct_boss_id,
+secondary_boss_id: profile.secondary_boss_id,
 must_change_password: profile.must_change_password,
 created_at: profile.created_at,
 updated_at: profile.updated_at,
@@ -86,6 +87,13 @@ if (error || !boss || !boss.active || !["manager", "admin"].includes(boss.role))
 throw new Error("The assigned direct manager must be active");
 }
 return bossId;
+}
+
+async function validBossPair(primary, secondary, targetId) {
+ const first = await assertValidBoss(primary, targetId);
+ const second = await assertValidBoss(secondary, targetId);
+ if (second && (!first || second === first)) throw new Error("Selecciona dos jefes distintos y activos.");
+ return { first, second };
 }
 
 
@@ -144,7 +152,7 @@ user.email?.toLowerCase() === "admin@wonderfieldgroup.com" &&
 Boolean(user.email_confirmed_at);
 
 const { data: actor, error: actorError } = await admin.from("profiles")
-.select("id, role, active, direct_boss_id")
+.select("id, role, active, direct_boss_id, secondary_boss_id")
 .eq("id", user.id)
 .maybeSingle();
 
@@ -159,12 +167,16 @@ const actorId = actor?.id ?? user.id;
 
 const action = payload.action;
 try {
-if (action === 'get_my_manager') {
+if (action === 'get_my_manager' || action === 'get_my_managers') {
   if (!actor?.active) return reply(request, 403, { error: 'Account not authorized' });
-  if (actor.role !== 'employee' || !actor.direct_boss_id) return reply(request, 200, { manager: null });
-  const { data: manager, error: managerError } = await admin.from('profiles').select('id,full_name,email').eq('id', actor.direct_boss_id).eq('active', true).in('role', ['manager', 'admin']).maybeSingle();
-  if (managerError) throw managerError;
-  return reply(request, 200, { manager });
+  const ids = actor.role === 'employee' ? [actor.direct_boss_id, actor.secondary_boss_id].filter(Boolean) : [];
+  let managers = [];
+  if (ids.length) {
+    const { data, error } = await admin.from('profiles').select('id,full_name,email').in('id', ids).eq('active', true).in('role', ['manager', 'admin']);
+    if (error) throw error;
+    managers = ids.map(id => (data || []).find(manager => manager.id === id)).filter(Boolean);
+  }
+  return reply(request, 200, action === 'get_my_manager' ? { manager: managers[0] || null } : { managers });
 }
 
 if (action === "change_own_password") {
@@ -185,7 +197,7 @@ if (actor?.role !== "admin" && !isVerifiedAdminIdentity) return reply(request, 4
 
 if (action === "list_users") {
 const { data, error } = await admin.from("profiles")
-.select("id,email,username,full_name,role,active,region,direct_boss_id,must_change_password,created_at,updated_at")
+.select("id,email,username,full_name,role,active,region,direct_boss_id,secondary_boss_id,must_change_password,created_at,updated_at")
 .order("full_name", { ascending: true });
 if (error) throw error;
 return reply(request, 200, { users: (data || []).map(publicProfile) });
@@ -202,7 +214,7 @@ if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return reply(request, 400, { erro
 if (!/^[A-Za-z0-9._-]{3,60}$/.test(username)) return reply(request, 400, { error: "El usuario debe tener de 3 a 60 caracteres alfanuméricos, punto, guion o guion bajo." });
 if (fullName.length < 2 || !allowedRoles.has(role)) return reply(request, 400, { error: "Datos de usuario no válidos." });
 if (!validPassword(payload.temporary_password)) return reply(request, 400, { error: "La contraseña temporal debe tener al menos 8 caracteres e incluir mayúscula, minúscula, número y símbolo." });
-const directBossId = await assertValidBoss(payload.direct_boss_id, null);
+const assignedBosses = await validBossPair(payload.direct_boss_id, payload.secondary_boss_id, null);
 const { data: created, error: createError } = await admin.auth.admin.createUser({
 email,
 password: payload.temporary_password,
@@ -211,9 +223,9 @@ user_metadata: { full_name: fullName },
 });
 if (createError || !created.user) throw createError || new Error("Unable to create user");
 const { data: profile, error: profileError } = await admin.from("profiles")
-.update({ username, full_name: fullName, role, active: true, region, notes, direct_boss_id: directBossId, must_change_password: true })
+.update({ username, full_name: fullName, role, active: true, region, notes, direct_boss_id: assignedBosses.first, secondary_boss_id: assignedBosses.second, must_change_password: true })
 .eq("id", created.user.id)
-.select("id,email,username,full_name,role,active,region,direct_boss_id,must_change_password,created_at,updated_at")
+.select("id,email,username,full_name,role,active,region,direct_boss_id,secondary_boss_id,must_change_password,created_at,updated_at")
 .single();
 if (profileError) {
 await admin.auth.admin.deleteUser(created.user.id);
@@ -226,7 +238,7 @@ return reply(request, 201, { user: publicProfile(profile) });
 const targetId = cleanText(payload.user_id, 36);
 if (!uuidPattern.test(targetId)) return reply(request, 400, { error: "Usuario no válido." });
 const { data: target, error: targetError } = await admin.from("profiles")
-.select("id,role,active")
+.select("id,role,active,direct_boss_id,secondary_boss_id")
 .eq("id", targetId)
 .maybeSingle();
 if (targetError || !target) return reply(request, 404, { error: "Usuario no encontrado." });
@@ -239,7 +251,9 @@ if (expenseCheckError) throw expenseCheckError;
 if ((expenseCount || 0) > 0) return reply(request, 409, { error: "La cuenta tiene gastos asociados. Desactívala para conservar el historial." });
 const { count: teamCount, error: teamError } = await admin.from("profiles").select("id", { count: "exact", head: true }).eq("direct_boss_id", target.id);
 if (teamError) throw teamError;
-if ((teamCount || 0) > 0) return reply(request, 409, { error: "Asigna otro jefe a sus colaboradores antes de eliminar esta cuenta." });
+const { count: secondTeamCount, error: secondTeamError } = await admin.from("profiles").select("id", { count: "exact", head: true }).eq("secondary_boss_id", target.id);
+if (secondTeamError) throw secondTeamError;
+if ((teamCount || 0) > 0 || (secondTeamCount || 0) > 0) return reply(request, 409, { error: "Asigna otro jefe a sus colaboradores antes de eliminar esta cuenta." });
 const { data: auditEntry, error: auditError } = await admin.from("admin_audit_log").insert({ actor_id: actorId, target_user_id: target.id, action: "USER_DELETED", metadata: { role: target.role } }).select("id").single();
 if (auditError) throw auditError;
 const { error: deleteError } = await admin.auth.admin.deleteUser(target.id, false);
@@ -273,12 +287,20 @@ updates.active = payload.active;
 }
 if (Object.hasOwn(payload, "region")) updates.region = cleanText(payload.region, 120) || null;
 if (Object.hasOwn(payload, "notes")) updates.notes = cleanText(payload.notes, 500) || null;
-if (Object.hasOwn(payload, "direct_boss_id")) updates.direct_boss_id = await assertValidBoss(payload.direct_boss_id, target.id);
+if (Object.hasOwn(payload, "direct_boss_id") || Object.hasOwn(payload, "secondary_boss_id")) {
+ const assignedBosses = await validBossPair(
+   Object.hasOwn(payload, "direct_boss_id") ? payload.direct_boss_id : target.direct_boss_id,
+   Object.hasOwn(payload, "secondary_boss_id") ? payload.secondary_boss_id : target.secondary_boss_id,
+   target.id
+ );
+ updates.direct_boss_id = assignedBosses.first;
+ updates.secondary_boss_id = assignedBosses.second;
+}
 if (Object.keys(updates).length === 0) return reply(request, 400, { error: "No hay cambios permitidos." });
 const { data: profile, error } = await admin.from("profiles")
 .update(updates)
 .eq("id", target.id)
-.select("id,email,username,full_name,role,active,region,direct_boss_id,must_change_password,created_at,updated_at")
+.select("id,email,username,full_name,role,active,region,direct_boss_id,secondary_boss_id,must_change_password,created_at,updated_at")
 .single();
 if (error) throw error;
 const auditAction = updates.active === false ? "USER_DEACTIVATED" : updates.active === true && !target.active ? "USER_ACTIVATED" : "USER_UPDATED";
