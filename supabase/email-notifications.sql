@@ -50,7 +50,7 @@ begin
    select 'employee'::text kind,p.id from public.profiles p where p.id=new.employee_id and p.active
    union all
    select 'manager',b.id from public.profiles p left join public.profiles b
-     on b.id=p.direct_boss_id and b.active and b.role in ('manager','admin')
+     on b.id in (p.direct_boss_id,p.secondary_boss_id) and b.active and b.role in ('manager','admin')
      where p.id=new.employee_id and new.status='PENDING'
    union all
    select 'finance',f.id from (select 1) seed left join public.profiles f on f.role='finance' and f.active
@@ -126,7 +126,7 @@ begin
    join public.profiles owner on owner.id=e.employee_id
    where p.id=job.recipient_id and p.active and owner.active and (
      (job.recipient_kind='employee' and p.id=e.employee_id) or
-     (job.recipient_kind='manager' and p.id=owner.direct_boss_id and p.role in ('manager','admin')) or
+     (job.recipient_kind='manager' and p.id in (owner.direct_boss_id,owner.secondary_boss_id) and p.role in ('manager','admin')) or
      (job.recipient_kind='finance' and p.role='finance'));
  if not found or recipient.email !~ '^[^[:space:]<>@]+@[^[:space:]<>@]+[.][^[:space:]<>@]+$' then
    update notification_private.outbox set state='blocked',last_error='recipient_invalid' where id=job.id;
