@@ -10,12 +10,12 @@ La instalacion del servidor esta versionada en [supabase/email-notifications.sql
 
 | Cambio confirmado en la base de datos | Aviso |
 | --- | --- |
-| Nuevo gasto PENDING | Acuse al Area Manager y aviso a su jefe directo activo |
+| Nuevo gasto PENDING | Acuse al Area Manager y aviso a sus dos jefes asignados activos (o al unico asignado) |
 | APPROVED | Estado al Area Manager y aviso a cada cuenta activa de Finanzas |
 | REJECTED | Estado al Area Manager; el motivo se consulta tras iniciar sesion |
 | PAID | Estado al Area Manager; no representa una transferencia realizada por el portal |
 
-Los correos se obtienen de profiles.email, el jefe de direct_boss_id y Finanzas del rol finance. No se envian automaticamente al administrador. Hay que registrar correos reales y asignar el jefe de cada empleado. Si falta un destinatario se registra recipient_missing, sin impedir guardar el gasto.
+Los correos se obtienen de profiles.email, los jefes de direct_boss_id y secondary_boss_id y todas las cuentas activas de Finanzas del rol finance. No se envian automaticamente al administrador. Hay que registrar correos reales y asignar el jefe de cada empleado. Si falta un destinatario se registra recipient_missing, sin impedir guardar el gasto.
 
 ## Activacion posterior: solo configuracion, sin cambiar el codigo
 
