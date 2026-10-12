@@ -74,8 +74,47 @@
   function showMandatoryPasswordChange() {
     const user = window.authService?.getCurrentProfile?.();
     if (!user?.mustChangePassword || document.getElementById('mandatoryPasswordModal')) return;
-    document.body.insertAdjacentHTML('beforeend', '<div id="mandatoryPasswordModal" class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/80"><form id="mandatoryPasswordForm" class="max-w-md w-full bg-white rounded-3xl p-6 space-y-4"><h3 class="font-black text-lg">Actualiza tu contraseña</h3><p class="text-xs text-slate-600">Por seguridad debes cambiar la contraseña temporal antes de continuar.</p><input id="mandatoryPasswordInput" type="password" required autocomplete="new-password" placeholder="8+ caracteres, mayúscula, minúscula, número y símbolo" class="w-full px-3 py-3 border rounded-xl"><div id="mandatoryPasswordError" class="hidden text-xs text-[#de4f5f] font-bold"></div><button class="w-full py-3 rounded-full bg-[#433364] text-white text-sm font-black">Guardar nueva contraseña</button></form></div>');
-    document.getElementById('mandatoryPasswordForm').onsubmit = async (event) => { event.preventDefault(); const password = document.getElementById('mandatoryPasswordInput').value; const error = document.getElementById('mandatoryPasswordError'); if (!strongPassword(password)) { error.textContent = 'La contraseña debe tener al menos 8 caracteres e incluir mayúscula, minúscula, número y símbolo.'; error.classList.remove('hidden'); return; } try { const result = await window.adminUserService.changeOwnPassword(password); if (result?.reauthRequired) return; const profile = await window.authService.loadProfile(); if (!profile || profile.status !== 'ACTIVE') throw new Error('Inicia sesión de nuevo con tu contraseña nueva.'); document.getElementById('mandatoryPasswordModal')?.remove(); } catch (err) { error.textContent = err.message; error.classList.remove('hidden'); } };
+    document.body.insertAdjacentHTML('beforeend', '<div id="mandatoryPasswordModal" class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/80"><form id="mandatoryPasswordForm" class="max-w-md w-full max-h-[90vh] overflow-y-auto bg-white rounded-3xl p-6 space-y-4"><h3 class="font-black text-lg">Actualiza tu contraseña</h3><p class="text-xs text-slate-600">Por seguridad debes cambiar la contraseña temporal antes de continuar.</p><label for="mandatoryPasswordInput" class="block text-xs font-black">Nueva contraseña</label><input id="mandatoryPasswordInput" name="new-password" type="password" required minlength="8" autocomplete="new-password" aria-describedby="mandatoryPasswordHint mandatoryPasswordError" placeholder="8+ caracteres, mayúscula, minúscula, número y símbolo" class="w-full px-3 py-3 border rounded-xl"><p id="mandatoryPasswordHint" class="text-xs text-slate-600">Mínimo 8 caracteres con mayúscula, minúscula, número y símbolo.</p><label for="mandatoryPasswordConfirm" class="block text-xs font-black">Confirmar nueva contraseña</label><input id="mandatoryPasswordConfirm" name="confirm-password" type="password" required minlength="8" autocomplete="new-password" aria-describedby="mandatoryPasswordError" placeholder="Repite la nueva contraseña" class="w-full px-3 py-3 border rounded-xl"><div id="mandatoryPasswordError" role="alert" class="hidden text-xs text-[#de4f5f] font-bold"></div><p id="mandatoryPasswordStatus" role="status" class="hidden text-xs text-slate-600"></p><button id="mandatoryPasswordSubmit" type="submit" class="w-full py-3 rounded-full bg-[#433364] text-white text-sm font-black">Guardar nueva contraseña</button></form></div>');
+    let changing = false;
+    document.getElementById('mandatoryPasswordForm').onsubmit = async event => {
+      event.preventDefault();
+      if (changing) return;
+      const password = document.getElementById('mandatoryPasswordInput').value;
+      const confirmation = document.getElementById('mandatoryPasswordConfirm').value;
+      const error = document.getElementById('mandatoryPasswordError');
+      const status = document.getElementById('mandatoryPasswordStatus');
+      const button = document.getElementById('mandatoryPasswordSubmit');
+      error.classList.add('hidden');
+      if (!strongPassword(password) || password !== confirmation) {
+        error.textContent = password !== confirmation ? 'Las contraseñas no coinciden. Revisa ambas casillas.' : 'La contraseña debe tener al menos 8 caracteres e incluir mayúscula, minúscula, número y símbolo.';
+        error.classList.remove('hidden');
+        error.scrollIntoView({ block: 'nearest' });
+        return;
+      }
+      changing = true;
+      button.disabled = true;
+      button.textContent = 'Guardando contraseña...';
+      status.textContent = 'Espera a que se confirme el cambio antes de cerrar esta ventana.';
+      status.classList.remove('hidden');
+      try {
+        const result = await window.adminUserService.changeOwnPassword(password);
+        if (result?.reauthRequired) return;
+        const profile = await window.authService.loadProfile();
+        if (!profile || profile.status !== 'ACTIVE' || profile.mustChangePassword) throw new Error('Inicia sesión de nuevo con tu contraseña nueva.');
+        await window.portalLoginCredentials?.updateAfterPasswordChange(password);
+        document.getElementById('mandatoryPasswordModal')?.remove();
+        window.alert('Contraseña actualizada. En tu próximo acceso utiliza la nueva contraseña, no la temporal.');
+      } catch (err) {
+        error.textContent = err.message || 'No se pudo completar la operación.';
+        error.classList.remove('hidden');
+        error.scrollIntoView({ block: 'nearest' });
+      } finally {
+        changing = false;
+        button.disabled = false;
+        button.textContent = 'Guardar nueva contraseña';
+        status.classList.add('hidden');
+      }
+    };
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -143,3 +182,4 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
+

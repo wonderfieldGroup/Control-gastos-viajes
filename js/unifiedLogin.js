@@ -40,6 +40,62 @@
   const errorBox = document.getElementById('unifiedLoginError');
   const submitButton = document.getElementById('unifiedLoginButton');
 
+  // Only reveal the value already entered by the user; never retrieve stored Auth passwords.
+  function addPasswordControls(root = document) {
+    const inputs = [];
+    if (root.matches?.('input[type="password"]')) inputs.push(root);
+    inputs.push(...root.querySelectorAll?.('input[type="password"]') || []);
+    inputs.forEach(input => {
+      if (input.dataset.passwordControl) return;
+      input.dataset.passwordControl = 'ready';
+      if (!input.id) input.id = 'portalPasswordField' + (++addPasswordControls.counter);
+      const wrapper = document.createElement('div');
+      wrapper.className = 'flex items-center gap-2';
+      input.parentNode.insertBefore(wrapper, input);
+      wrapper.append(input);
+      input.classList.add('min-w-0', 'flex-1');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-[#433364] bg-slate-50 focus:ring-2 focus:ring-[#433364]';
+      button.dataset.passwordToggle = input.id;
+      button.textContent = 'Mostrar';
+      button.setAttribute('aria-controls', input.id);
+      button.setAttribute('aria-pressed', 'false');
+      button.setAttribute('aria-label', 'Mostrar contraseña');
+      button.onclick = event => {
+        event.preventDefault();
+        const visible = input.type === 'password';
+        input.type = visible ? 'text' : 'password';
+        button.textContent = visible ? 'Ocultar' : 'Mostrar';
+        button.setAttribute('aria-label', visible ? 'Ocultar contraseña' : 'Mostrar contraseña');
+        button.setAttribute('aria-pressed', String(visible));
+        window.portalI18n?.apply();
+      };
+      wrapper.append(button);
+    });
+  }
+  addPasswordControls.counter = 0;
+  addPasswordControls();
+  new MutationObserver(records => {
+    for (const record of records) {
+      for (const node of record.addedNodes) {
+        if (node.nodeType === 1) addPasswordControls(node);
+      }
+    }
+  }).observe(document.body, { childList: true, subtree: true });
+
+  function clearLoginPasswords() {
+    [passwordInput, ...Object.values(roleConfig).map(config => document.getElementById(config.password))]
+      .filter(Boolean).forEach(input => { input.value = ''; });
+    document.querySelectorAll('[data-password-toggle]').forEach(button => {
+      const input = document.getElementById(button.dataset.passwordToggle);
+      if (input) input.type = 'password';
+      button.textContent = 'Mostrar';
+      button.setAttribute('aria-label', 'Mostrar contraseña');
+      button.setAttribute('aria-pressed', 'false');
+    });
+  }
+
   function hideRoleNavigation() {
     const employeeTab = document.getElementById('navTabEmployee');
     if (employeeTab && employeeTab.parentElement) employeeTab.parentElement.classList.add('hidden');
@@ -92,6 +148,9 @@
     roleForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     await waitForDashboard(config);
 
+    // The panel is already authenticated; do not retain duplicate password fields.
+    passwordField.value = '';
+
     hideAllViews();
     document.getElementById(config.view)?.classList.remove('hidden');
     access.classList.add('hidden');
@@ -107,6 +166,16 @@
       console.info('El navegador no guardó las credenciales.', error);
     }
   }
+
+  window.portalLoginCredentials = {
+    async updateAfterPasswordChange(password) {
+      const profile = window.authService?.getCurrentProfile?.();
+      if (!profile || profile.mustChangePassword) return;
+      const identifier = identifierInput.value.trim() || profile.username || profile.email;
+      clearLoginPasswords();
+      await rememberCredentials(identifier, password);
+    }
+  };
 
   async function fillSavedCredentials() {
     if (!navigator.credentials?.get) return;
@@ -142,7 +211,9 @@
         throw new Error('Tu cuenta está desactivada o no está aprovisionada. Contacta a TI.');
       }
       await openAssignedPanel(profile, identifier, password);
-      await rememberCredentials(identifier, password);
+      // Do not explicitly save a temporary password that is about to be replaced.
+      if (!profile.mustChangePassword) await rememberCredentials(identifier, password);
+      passwordInput.value = '';
     } catch (error) {
       await window.authService?.logout?.();
       showUnifiedLogin(error.message);
@@ -153,12 +224,15 @@
   });
 
   ['btnEmployeeLogout', 'btnManagerLogout', 'btnFinanceLogout', 'btnAdminLogout'].forEach(id => {
-    document.getElementById(id)?.addEventListener('click', () => setTimeout(() => showUnifiedLogin(), 0));
+    document.getElementById(id)?.addEventListener('click', () => setTimeout(() => {
+      clearLoginPasswords();
+      showUnifiedLogin();
+    }, 0));
   });
 
   window.addEventListener('portal:reauth-required', event => {
     document.getElementById('mandatoryPasswordModal')?.remove();
-    passwordInput.value = '';
+    clearLoginPasswords();
     showUnifiedLogin(event.detail?.message || 'Inicia sesión de nuevo para continuar.');
   });
 
@@ -168,3 +242,4 @@
     if (!passwordInput.value) identifierInput.focus();
   }, { once: true });
 })();
+
