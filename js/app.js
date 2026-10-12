@@ -1,6 +1,6 @@
 /**
  * The Wonderfield Group - Sistema Corporativo de Gastos de Viaje
- * Controlador con 4 módulos: Area Manager (por correo), Jefe Directo, Finanzas y Administrador
+ * Controlador con 4 módulos: Empleado (por correo), Jefe Directo, Finanzas y Administrador
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const ratesTicker = document.getElementById('ratesTicker');
 
   // ----------------------------------------------------
-  // ELEMENTOS: VISTA AREA MANAGER (ACCESO POR CORREO)
+  // ELEMENTOS: VISTA EMPLEADO (ACCESO POR CORREO)
   // ----------------------------------------------------
   const empLoginBox = document.getElementById('empLoginBox');
   const empDashboard = document.getElementById('empDashboard');
@@ -280,7 +280,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ----------------------------------------------------
-  // AUTENTICACIÓN POR CORREO: AREA MANAGER (PESTAÑA 1)
+  // AUTENTICACIÓN POR CORREO: EMPLEADO (PESTAÑA 1)
   // ----------------------------------------------------
 
   empLoginForm.addEventListener('submit', async (e) => {
@@ -289,7 +289,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const res = await window.authService.loginEmployee(empLoginEmail.value, empLoginPassword.value);
     if (res.success) {
       await loadAllExpenses();
-      showToast(`👋 Bienvenido Area Manager, ${res.employee.name}`, 'success');
+      showToast(`👋 Bienvenido Empleado, ${res.employee.name}`, 'success');
       renderEmployeeView();
       if (window.confetti) window.confetti({ particleCount: 30, spread: 50, origin: { y: 0.6 } });
     } else {
@@ -300,7 +300,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   btnEmployeeLogout.addEventListener('click', async () => {
     await window.authService.logout();
-    showToast('Sesión de Area Manager cerrada', 'info');
+    showToast('Sesión de Empleado cerrada', 'info');
     renderEmployeeView();
   });
 
@@ -443,7 +443,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ----------------------------------------------------
-  // TABLA: AREA MANAGERS & JEFES DIRECTOS (ADMIN)
+  // TABLA: EMPLEADOS & JEFES DIRECTOS (ADMIN)
   // ----------------------------------------------------
   function renderAreaManagersTable() {
     const list = window.authService.getAreaManagers();
@@ -493,7 +493,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!item) return;
 
     const subject = `[The Wonderfield Group] Gasto pendiente de aprobación - ${item.name}`;
-    const body = `Estimado/a ${item.directBoss},\n\nLe informamos que el/la Area Manager ${item.name} (${item.region}) ha registrado un nuevo comprobante de gasto de viaje internacional pendiente de su autorización en The Wonderfield Group.\n\nDetalles:\n• Solicitante: ${item.name}\n• Región / Marca: ${item.region}\n• Estado: Pendiente de Aprobación por Jefatura\n\nPor favor ingrese al sistema corporativo en el módulo "2. Aprobación Jefe Directo" para revisar el comprobante y autorizar la liquidación contable.\n\nAtentamente,\nThe Wonderfield Group • Travel & Expense Management\n"Where good things come from."`;
+    const body = `Estimado/a ${item.directBoss},\n\nLe informamos que el/la Empleado ${item.name} (${item.region}) ha registrado un nuevo comprobante de gasto de viaje internacional pendiente de su autorización en The Wonderfield Group.\n\nDetalles:\n• Solicitante: ${item.name}\n• Región / Marca: ${item.region}\n• Estado: Pendiente de Aprobación por Jefatura\n\nPor favor ingrese al sistema corporativo en el módulo "2. Aprobación Jefe Directo" para revisar el comprobante y autorizar la liquidación contable.\n\nAtentamente,\nThe Wonderfield Group • Travel & Expense Management\n"Where good things come from."`;
 
     previewEmailTo.textContent = item.bossEmail;
     previewEmailSubject.textContent = subject;
@@ -591,7 +591,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ----------------------------------------------------
-  // RENDERIZADO: PESTAÑA 1 (AREA MANAGER - PRIVADO POR CORREO)
+  // RENDERIZADO: PESTAÑA 1 (EMPLEADO - PRIVADO POR CORREO)
   // ----------------------------------------------------
   function renderEmployeeView() {
     const isAuth = window.authService.isEmployeeAuthenticated();
@@ -604,7 +604,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // Sesión activa de Area Manager
+    // Sesión activa de Empleado
     const currentEmp = window.authService.getCurrentEmployee();
     empLoginBox.classList.add('hidden');
     empDashboard.classList.remove('hidden');
@@ -619,7 +619,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     employeeInput.value = currentEmp.name;
     detectedBossInfo.textContent = `👔 Jefe Directo asignado: ${currentEmp.directBoss} (${currentEmp.bossEmail})`;
 
-    // FILTRAR ESTRICTAMENTE SOLO LOS GASTOS DE ESTE AREA MANAGER
+    // FILTRAR ESTRICTAMENTE SOLO LOS GASTOS DE ESTE EMPLEADO
     const myExpenses = expenses.filter(e => {
       const matchName = (e.employee || '').trim().toLowerCase() === currentEmp.name.trim().toLowerCase();
       const matchEmail = (e.employeeEmail || '').trim().toLowerCase() === currentEmp.email.trim().toLowerCase();
@@ -1424,14 +1424,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ----------------------------------------------------
-  // ENVIAR / REGISTRAR GASTO (AREA MANAGER)
+  // ENVIAR / REGISTRAR GASTO (EMPLEADO)
   // ----------------------------------------------------
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const currentEmp = window.authService.getCurrentEmployee();
     if (!currentEmp) {
-      showToast('Inicia sesión como Area Manager para registrar un gasto.', 'error');
+      showToast('Inicia sesión como Empleado para registrar un gasto.', 'error');
       return;
     }
 
@@ -1729,3 +1729,4 @@ document.addEventListener('DOMContentLoaded', async () => {
       .replace(/'/g, '&#039;');
   }
 });
+
