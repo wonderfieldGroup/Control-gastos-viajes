@@ -10,10 +10,10 @@ La instalacion del servidor esta versionada en [supabase/email-notifications.sql
 
 | Cambio confirmado en la base de datos | Aviso |
 | --- | --- |
-| Nuevo gasto PENDING | Acuse al Area Manager y aviso a sus dos jefes asignados activos (o al unico asignado) |
-| APPROVED | Estado al Area Manager y aviso a cada cuenta activa de Finanzas |
-| REJECTED | Estado al Area Manager; el motivo se consulta tras iniciar sesion |
-| PAID | Estado al Area Manager; no representa una transferencia realizada por el portal |
+| Nuevo gasto PENDING | Acuse al Empleado y aviso a sus dos jefes asignados activos (o al unico asignado) |
+| APPROVED | Estado al Empleado y aviso a cada cuenta activa de Finanzas |
+| REJECTED | Estado al Empleado; el motivo se consulta tras iniciar sesion |
+| PAID | Estado al Empleado; no representa una transferencia realizada por el portal |
 
 Los correos se obtienen de profiles.email, los jefes de direct_boss_id y secondary_boss_id y todas las cuentas activas de Finanzas del rol finance. No se envian automaticamente al administrador. Hay que registrar correos reales y asignar el jefe de cada empleado. Si falta un destinatario se registra recipient_missing, sin impedir guardar el gasto.
 
@@ -68,3 +68,4 @@ from notification_private.outbox where state in ('failed','blocked') order by cr
 ```
 
 Las pruebas [supabase/tests/email-notifications.sql](supabase/tests/email-notifications.sql) usan datos ficticios y respuestas HTTP simuladas dentro de BEGIN/ROLLBACK. Requieren envio desactivado y ausencia de travel_resend_api_key; no deben ejecutarse despues de configurar una clave real. Verifican routing, duplicados, modo apagado, ausencia de credencial, aislamiento, aceptacion simulada, timeout, fallos definitivos y agotamiento de reintentos. Una prueba real de entrega queda pendiente de la cuenta y dominio oficiales.
+
