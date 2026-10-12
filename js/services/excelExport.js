@@ -27,7 +27,7 @@ class ExcelExportService {
     const headers = [
       'N°',
       'Fecha',
-      'Area Manager / Empleado',
+      'Empleado',
       'Viaje / Destino',
       'Motivo / Concepto',
       'Categoría',
@@ -255,3 +255,4 @@ class ExcelExportService {
 }
 
 window.excelExportService = new ExcelExportService();
+
