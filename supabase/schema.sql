@@ -260,7 +260,7 @@ grant execute on function public.reject_expense(uuid, text) to authenticated;
 grant execute on function public.mark_expense_paid(uuid, text) to authenticated;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('receipts', 'receipts', false, 2097152, array['image/jpeg','image/png','application/pdf'])
+values ('receipts', 'receipts', false, 5242880, array['image/jpeg','image/png','application/pdf'])
 on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
 
@@ -291,3 +291,4 @@ create trigger profiles_touch_updated_at before update on public.profiles
 for each row execute function public.touch_updated_at();
 create trigger expenses_touch_updated_at before update on public.expenses
 for each row execute function public.touch_updated_at();
+
