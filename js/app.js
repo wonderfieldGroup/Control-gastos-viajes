@@ -1370,7 +1370,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function showExpenseFormError(message) {
-    expenseFormError.textContent = window.portalI18n?.t(message) || message;
+    expenseFormError.textContent = message;
     expenseFormError.classList.remove('hidden');
     expenseFormError.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
