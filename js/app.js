@@ -99,6 +99,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const receiptFileName = document.getElementById('receiptFileName');
   const btnRemoveImage = document.getElementById('btnRemoveImage');
   const receiptBase64 = document.getElementById('receiptBase64');
+  const btnSubmitExpense = document.getElementById('btnSubmitExpense');
+  const expenseFormError = document.getElementById('expenseFormError');
+  const receiptPdfPreview = document.getElementById('receiptPdfPreview');
+  let receiptReading = false, receiptInvalid = false, receiptSelection = 0, expenseSaving = false;
 
   const empStatTotalEUR = document.getElementById('empStatTotalEUR');
   const empStatPending = document.getElementById('empStatPending');
@@ -1360,29 +1364,52 @@ document.addEventListener('DOMContentLoaded', async () => {
     clearImagePreview();
   });
 
-  function handleImageFile(file) {
-    if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
-      showToast('Por favor selecciona una imagen válida (JPG, PNG, etc.).', 'error');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const rawDataUrl = event.target.result;
-      if (file.type.startsWith('image/')) {
-        compressImage(rawDataUrl, 1200, 0.8, (compressedDataUrl) => {
-          setImagePreview(compressedDataUrl, file.name);
-        });
-      } else {
-        setImagePreview(rawDataUrl, file.name);
-      }
-    };
-    reader.readAsDataURL(file);
+  function clearExpenseFormError() {
+    expenseFormError.textContent = '';
+    expenseFormError.classList.add('hidden');
   }
 
-  function compressImage(dataUrl, maxDimension, quality, callback) {
+  function showExpenseFormError(message) {
+    expenseFormError.textContent = window.portalI18n?.t(message) || message;
+    expenseFormError.classList.remove('hidden');
+    expenseFormError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  async function handleImageFile(file) {
+    if (expenseSaving) return;
+    clearImagePreview();
+    clearExpenseFormError();
+    const selection = receiptSelection;
+    receiptReading = true;
+    receiptInvalid = true;
+    try {
+      if (!file.size || file.size > window.databaseService.maxReceiptBytes) await window.databaseService.validateReceiptBlob(file);
+      const rawDataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reader.onabort = () => reject(window.databaseService.receiptError('READ', 'No se pudo leer el comprobante adjunto. Selecciónalo de nuevo e inténtalo.'));
+        reader.readAsDataURL(file);
+      });
+      const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name);
+      const dataUrl = isImage ? await compressImage(rawDataUrl, 1600, 0.85) : rawDataUrl;
+      const validated = await window.databaseService.validateReceipt(dataUrl);
+      if (selection !== receiptSelection) return;
+      setImagePreview(dataUrl, file.name, validated.type === 'application/pdf');
+      receiptInvalid = false;
+    } catch (error) {
+      if (selection === receiptSelection) showExpenseFormError(window.databaseService.getExpenseErrorMessage(error));
+    } finally {
+      if (selection === receiptSelection) receiptReading = false;
+    }
+  }
+
+  function compressImage(dataUrl, maxDimension, quality) {
+    return new Promise((resolve, reject) => {
     const img = new Image();
+    const fail = () => reject(window.databaseService.receiptError('IMAGE_READ', 'El navegador no pudo leer esta imagen. Guárdala como JPG o PNG y vuelve a adjuntarla.'));
+    img.onerror = fail;
     img.onload = () => {
+      try {
       let width = img.width;
       let height = img.height;
       if (width > height) {
@@ -1400,21 +1427,32 @@ document.addEventListener('DOMContentLoaded', async () => {
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
       ctx.drawImage(img, 0, 0, width, height);
-      callback(canvas.toDataURL('image/jpeg', quality));
+      resolve(canvas.toDataURL('image/jpeg', quality));
+      } catch (_) { fail(); }
     };
     img.src = dataUrl;
+    });
   }
 
-  function setImagePreview(dataUrl, filename) {
+  function setImagePreview(dataUrl, filename, isPdf = /^data:application\/pdf[;,]/i.test(dataUrl)) {
     receiptBase64.value = dataUrl;
-    receiptPreviewImg.src = dataUrl;
+    receiptPreviewImg.src = isPdf ? '' : dataUrl;
+    receiptPreviewImg.classList.toggle('hidden', isPdf);
+    receiptPdfPreview.classList.toggle('hidden', !isPdf);
     receiptFileName.textContent = filename || 'Comprobante adjunto';
     dropzonePrompt.classList.add('hidden');
     previewContainer.classList.remove('hidden');
   }
 
   function clearImagePreview() {
+    receiptSelection += 1;
+    receiptReading = false;
+    receiptInvalid = false;
+    receiptPdfPreview.classList.add('hidden');
+    clearExpenseFormError();
     receiptBase64.value = '';
     receiptPreviewImg.src = '';
     receiptFileName.textContent = '';
@@ -1428,6 +1466,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ----------------------------------------------------
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (expenseSaving) return;
+    if (receiptReading) { showExpenseFormError('Espera a que termine de prepararse el comprobante antes de enviarlo.'); return; }
+    if (receiptInvalid) { expenseFormError.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+    clearExpenseFormError();
 
     const currentEmp = window.authService.getCurrentEmployee();
     if (!currentEmp) {
@@ -1477,6 +1519,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       receiptImage: receiptBase64.value || null
     };
 
+    expenseSaving = true;
+    btnSubmitExpense.disabled = true;
     try {
       if (expenseIdInput.value) {
         await window.databaseService.update(expenseData);
@@ -1496,14 +1540,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       resetForm();
-      await loadAllExpenses();
+      try { await loadAllExpenses(); }
+      catch (refreshError) {
+        console.error('No se pudo actualizar la lista después de guardar:', refreshError);
+        showToast('El gasto se guardó, pero no se pudo actualizar la lista. Recarga la página antes de volver a enviarlo.', 'error');
+      }
     } catch (err) {
       console.error(err);
-      showToast('Error al guardar el gasto', 'error');
+      showExpenseFormError(window.databaseService.getExpenseErrorMessage(err));
+      showToast('No se pudo enviar el gasto. Revisa el aviso del formulario.', 'error');
+    } finally {
+      expenseSaving = false;
+      btnSubmitExpense.disabled = false;
     }
   });
 
   function resetForm() {
+    clearExpenseFormError();
     form.reset();
     expenseIdInput.value = '';
     formTitle.textContent = 'Registrar Gasto de Viaje';
@@ -1729,4 +1782,5 @@ document.addEventListener('DOMContentLoaded', async () => {
       .replace(/'/g, '&#039;');
   }
 });
+
 
