@@ -1438,6 +1438,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function setImagePreview(dataUrl, filename, isPdf = /^data:application\/pdf[;,]/i.test(dataUrl)) {
+    receiptSelection += 1;
+    receiptReading = false;
+    receiptInvalid = false;
+    clearExpenseFormError();
     receiptBase64.value = dataUrl;
     receiptPreviewImg.src = isPdf ? '' : dataUrl;
     receiptPreviewImg.classList.toggle('hidden', isPdf);
@@ -1651,7 +1655,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (item.receiptImage) {
-      setImagePreview(item.receiptImage, 'Comprobante adjunto');
+      setImagePreview(item.receiptImage, item.receiptName || 'Comprobante adjunto', item.receiptMimeType === 'application/pdf');
     } else {
       clearImagePreview();
     }
