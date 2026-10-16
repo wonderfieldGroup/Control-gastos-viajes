@@ -1,6 +1,6 @@
 /* Persistencia de gastos en Supabase: Postgres para metadatos y Storage privado para comprobantes. */
 class DatabaseService {
-  constructor() { this.client = window.supabaseClient; this.readyPromise = Promise.resolve(this.client); this.receiptUrlCache = new Map(); }
+  constructor() { this.client = window.supabaseClient; this.readyPromise = Promise.resolve(this.client); this.receiptUrlCache = new Map(); this.maxReceiptBytes = 5 * 1024 * 1024; }
   async ensureDb() { return this.readyPromise; }
   async getAll() { const { data, error } = await this.client.from('expenses').select('*').order('created_at', { ascending: false }); if (error) throw error; return Promise.all((data || []).map(row => this.toAppExpense(row))); }
   async getById(id) { const { data, error } = await this.client.from('expenses').select('*').eq('id', id).single(); if (error) throw error; return this.toAppExpense(data); }
@@ -12,7 +12,19 @@ class DatabaseService {
   async delete(id) { const expense = await this.getById(id); if (expense.receiptPath) { const { error: storageError } = await this.client.storage.from('receipts').remove([expense.receiptPath]); if (storageError) throw storageError; } const { error } = await this.client.from('expenses').delete().eq('id', id); if (error) throw error; return true; }
   async clear() { throw new Error('La limpieza global no está disponible en producción.'); }
   async currentUser() { const profile = window.authService?.getCurrentProfile(); if (!profile || profile.status !== 'ACTIVE') throw new Error('Tu sesión no está autorizada para registrar gastos.'); return profile; }
-  async uploadReceipt(dataUrl, expenseId, userId, upsert = false) { if (!dataUrl) return null; const blob = await this.validateReceipt(dataUrl); const extension = blob.type === 'application/pdf' ? 'pdf' : blob.type === 'image/png' ? 'png' : 'jpg'; const path = userId + '/' + expenseId + '/comprobante.' + extension; const { error } = await this.client.storage.from('receipts').upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert }); if (error) { throw new Error('No se pudo subir el comprobante: ' + (error.message || error.error || 'error de almacenamiento')); } return { path, name: 'comprobante.' + extension, mimeType: blob.type || 'image/jpeg' }; }
+  async uploadReceipt(dataUrl, expenseId, userId, upsert = false) {
+    if (!dataUrl) return null;
+    const blob = await this.validateReceipt(dataUrl);
+    const extension = blob.type === 'application/pdf' ? 'pdf' : blob.type === 'image/png' ? 'png' : 'jpg';
+    const path = userId + '/' + expenseId + '/comprobante.' + extension;
+    try {
+      const { error } = await this.client.storage.from('receipts').upload(path, blob, { contentType: blob.type, upsert });
+      if (error) throw error;
+    } catch (error) {
+      throw this.receiptError('UPLOAD_FAILED', this.getExpenseErrorMessage(error, true));
+    }
+    return { path, name: 'comprobante.' + extension, mimeType: blob.type };
+  }
   async toAppExpense(row) { let receiptImage = null; if (row.receipt_path) { const viewerId = window.authService?.getCurrentProfile?.()?.id || ''; const cacheKey = viewerId + ':' + row.receipt_path; const cached = this.receiptUrlCache.get(cacheKey); if (cached && cached.expiresAt > Date.now()) receiptImage = cached.url; else { const { data } = await this.client.storage.from('receipts').createSignedUrl(row.receipt_path, 300); receiptImage = data?.signedUrl || null; if (receiptImage) this.receiptUrlCache.set(cacheKey, { url: receiptImage, expiresAt: Date.now() + 240000 }); } } return { id: row.id, employeeId: row.employee_id, employee: row.employee, date: row.date, trip: row.trip, reason: row.reason, category: row.category, docType: row.doc_type, currency: row.currency, originalAmount: Number(row.original_amount), rateToEUR: Number(row.rate_to_eur), amountEUR: Number(row.amount_eur), hasIva: row.has_iva, ivaRate: Number(row.iva_rate), baseEUR: Number(row.base_eur), ivaEUR: Number(row.iva_eur), status: row.status, receiptImage, receiptPath: row.receipt_path, receiptName: row.receipt_name, receiptMimeType: row.receipt_mime_type, notes: row.notes, approvedAt: row.approved_at, rejectedAt: row.status === 'REJECTED' ? row.approved_at : null, rejectionReason: row.rejection_reason, paidAt: row.paid_at, paymentRef: row.payment_ref, createdAt: row.created_at, updatedAt: row.updated_at }; }
   toDbExpense(expense, receipt) { return { id: expense.id, employee_id: expense.employeeId, employee: expense.employee, date: expense.date, trip: expense.trip || 'General', reason: expense.reason, category: expense.category, doc_type: expense.docType, currency: expense.currency, original_amount: expense.originalAmount, rate_to_eur: expense.rateToEUR, amount_eur: expense.amountEUR, has_iva: Boolean(expense.hasIva), iva_rate: expense.ivaRate || 0, base_eur: expense.baseEUR || 0, iva_eur: expense.ivaEUR || 0, status: expense.status || 'PENDING', receipt_path: receipt?.path || null, receipt_name: receipt?.name || null, receipt_mime_type: receipt?.mimeType || null, notes: expense.notes || null }; }
   async validateReceipt(dataUrl) {
@@ -20,15 +32,39 @@ class DatabaseService {
     try { const response = await fetch(dataUrl); blob = await response.blob(); }
     catch (_) {
       const match = /^data:([^;,]+)?(;base64)?,([\s\S]*)$/.exec(String(dataUrl));
-      if (!match) throw new Error('No se pudo leer el comprobante adjunto. Selecciónalo de nuevo e inténtalo.');
+      if (!match) throw this.receiptError('READ', 'No se pudo leer el comprobante adjunto. Selecciónalo de nuevo e inténtalo.');
       try { const bytes = match[2] ? Uint8Array.from(atob(match[3]), char => char.charCodeAt(0)) : new TextEncoder().encode(decodeURIComponent(match[3])); blob = new Blob([bytes], { type: match[1] || 'application/octet-stream' }); }
-      catch (_) { throw new Error('No se pudo leer el comprobante adjunto. Selecciónalo de nuevo e inténtalo.'); }
+      catch (_) { throw this.receiptError('READ', 'No se pudo leer el comprobante adjunto. Selecciónalo de nuevo e inténtalo.'); }
     }
-    if (blob.size === 0 || blob.size > 2 * 1024 * 1024) throw new Error('El comprobante debe tener entre 1 byte y 2 MB.');
+    return this.validateReceiptBlob(blob);
+  }
+  receiptError(code, message) {
+    const error = new Error(message);
+    error.receiptCode = code;
+    error.receiptPublicMessage = message;
+    return error;
+  }
+  async validateReceiptBlob(blob) {
+    if (!blob || blob.size === 0) throw this.receiptError('EMPTY', 'El comprobante está vacío. Selecciona otro archivo.');
+    if (blob.size > this.maxReceiptBytes) throw this.receiptError('TOO_LARGE', 'El comprobante supera el máximo de 5 MB. Tamaño del archivo: ' + (blob.size / 1024 / 1024).toFixed(2) + ' MB.');
     const header = new Uint8Array(await blob.slice(0, 8).arrayBuffer()); const startsWith = (...bytes) => bytes.every((byte, index) => header[index] === byte);
     const isJpeg = startsWith(0xff, 0xd8, 0xff); const isPng = startsWith(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a); const isPdf = startsWith(0x25, 0x50, 0x44, 0x46, 0x2d);
-    if (!isJpeg && !isPng && !isPdf) throw new Error('Formato no permitido. Adjunta una imagen JPEG/PNG o un PDF válido.');
+    if (!isJpeg && !isPng && !isPdf) throw this.receiptError('FORMAT', 'Formato no permitido. Adjunta una imagen JPEG/PNG o un PDF válido.');
     return new Blob([blob], { type: isPdf ? 'application/pdf' : isPng ? 'image/png' : 'image/jpeg' });
+  }
+  getExpenseErrorMessage(error, uploading = false) {
+    if (error?.receiptCode && error.receiptPublicMessage) return error.receiptPublicMessage;
+    const code = String(error?.statusCode || error?.status || error?.code || '');
+    const detail = String(error?.message || error?.error || '');
+    if (code === '413' || /payload too large|exceed.*(size|limit)|entity too large/i.test(detail)) return 'El servidor rechazó el tamaño del comprobante. El máximo permitido es 5 MB.';
+    if (code === '415' || /mime.*not.*(allow|support)|invalid.*mime/i.test(detail)) return 'Formato no permitido. Adjunta una imagen JPEG/PNG o un PDF válido.';
+    if (code === '401' || /^PGRST30/.test(code) || /jwt.*expired|invalid.*jwt|session.*expired/i.test(detail)) return 'Tu sesión ha caducado. Vuelve a iniciar sesión y reintenta el envío.';
+    if (code === '403' || code === '42501' || /row.level security|unauthorized|permission denied/i.test(detail)) return 'Tu cuenta no tiene permisos para guardar este gasto o comprobante. Contacta con el administrador.';
+    if (code === '23514') return 'Los datos del gasto no cumplen las validaciones. Revisa fecha, importes y comprobante.';
+    if (/quota|storage.*full|disk.*full/i.test(detail)) return 'El almacenamiento del portal está lleno. Contacta con el administrador.';
+    if (code === '408' || code === '504' || /failed to fetch|network|load failed|timeout|timed out/i.test(detail)) return 'No se pudo conectar con el servidor. Comprueba tu conexión y vuelve a intentarlo.';
+    return uploading ? 'No se pudo subir el comprobante. Inténtalo de nuevo o contacta con el administrador.' : 'No se pudo guardar el gasto. Revisa los datos e inténtalo de nuevo.';
   }
 }
 window.databaseService = new DatabaseService();
+
