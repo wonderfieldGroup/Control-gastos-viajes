@@ -34,6 +34,373 @@
   translations.set('Guardando contraseña...', { en: 'Saving password...', it: 'Salvataggio della password...' });
   translations.set('Espera a que se confirme el cambio antes de cerrar esta ventana.', { en: 'Wait for the change to be confirmed before closing this window.', it: 'Attendi la conferma della modifica prima di chiudere questa finestra.' });
   translations.set('Contraseña actualizada. En tu próximo acceso utiliza la nueva contraseña, no la temporal.', { en: 'Password updated. Use your new password, not the temporary one, the next time you sign in.', it: 'Password aggiornata. Al prossimo accesso usa la nuova password, non quella temporanea.' });
+  const dashboardMessages = [
+  [
+    "Dashboard",
+    "Dashboard",
+    "Dashboard"
+  ],
+  [
+    "Solicitudes",
+    "Requests",
+    "Richieste"
+  ],
+  [
+    "Vistas de Finanzas",
+    "Finance views",
+    "Viste Finanza"
+  ],
+  [
+    "Jefe asignado",
+    "Assigned manager",
+    "Responsabile assegnato"
+  ],
+  [
+    "Jefes asignados",
+    "Assigned managers",
+    "Responsabili assegnati"
+  ],
+  [
+    "Desde el mes",
+    "From month",
+    "Dal mese"
+  ],
+  [
+    "Hasta el mes",
+    "To month",
+    "Al mese"
+  ],
+  [
+    "Agrupar las fechas por",
+    "Group dates by",
+    "Raggruppa le date per"
+  ],
+  [
+    "Ordenar los rankings por",
+    "Rank by",
+    "Ordina le classifiche per"
+  ],
+  [
+    "Dashboard de solicitudes",
+    "Expense request dashboard",
+    "Dashboard delle richieste di spesa"
+  ],
+  [
+    "Visión global de los equipos autorizados para Finanzas.",
+    "Overview of the teams accessible to Finance.",
+    "Panoramica dei team accessibili a Finanza."
+  ],
+  [
+    "Análisis de las solicitudes de tu equipo autorizado.",
+    "Analysis of requests from your authorized team.",
+    "Analisi delle richieste del tuo team autorizzato."
+  ],
+  [
+    "Importes equivalentes en EUR guardados en cada solicitud. Incluye rechazadas salvo que filtres el estado.",
+    "EUR equivalents saved with each request. Rejected requests are included unless filtered out by status.",
+    "Importi equivalenti in EUR salvati in ogni richiesta. Le richieste rifiutate sono incluse salvo filtro sullo stato."
+  ],
+  [
+    "Actualizar datos",
+    "Refresh data",
+    "Aggiorna dati"
+  ],
+  [
+    "Descargar CSV filtrado",
+    "Download filtered CSV",
+    "Scarica CSV filtrato"
+  ],
+  [
+    "Limpiar filtros",
+    "Clear filters",
+    "Azzera filtri"
+  ],
+  [
+    "Jefe no disponible",
+    "Manager unavailable",
+    "Responsabile non disponibile"
+  ],
+  [
+    "Sin jefe asignado",
+    "No assigned manager",
+    "Nessun responsabile assegnato"
+  ],
+  [
+    "Todos los jefes",
+    "All managers",
+    "Tutti i responsabili"
+  ],
+  [
+    "Sin empleado",
+    "No employee",
+    "Nessun dipendente"
+  ],
+  [
+    "Todos los empleados",
+    "All employees",
+    "Tutti i dipendenti"
+  ],
+  [
+    "Sin categoría",
+    "No category",
+    "Nessuna categoria"
+  ],
+  [
+    "Todas las categorías",
+    "All categories",
+    "Tutte le categorie"
+  ],
+  [
+    "Todos los estados",
+    "All statuses",
+    "Tutti gli stati"
+  ],
+  [
+    "Fecha del gasto",
+    "Expense date",
+    "Data della spesa"
+  ],
+  [
+    "Fecha de registro (UTC)",
+    "Submission date (UTC)",
+    "Data di registrazione (UTC)"
+  ],
+  [
+    "Importe solicitado",
+    "Requested amount",
+    "Importo richiesto"
+  ],
+  [
+    "Número de solicitudes",
+    "Number of requests",
+    "Numero di richieste"
+  ],
+  [
+    "El mes inicial no puede ser posterior al mes final.",
+    "The start month cannot be later than the end month.",
+    "Il mese iniziale non può essere successivo al mese finale."
+  ],
+  [
+    "Solicitudes filtradas",
+    "Filtered requests",
+    "Richieste filtrate"
+  ],
+  [
+    "Empleados con solicitudes",
+    "Employees with requests",
+    "Dipendenti con richieste"
+  ],
+  [
+    "Pendiente de aprobación",
+    "Pending approval",
+    "In attesa di approvazione"
+  ],
+  [
+    "Aprobado por pagar",
+    "Approved, awaiting payment",
+    "Approvato, in attesa di pagamento"
+  ],
+  [
+    "Importe pagado",
+    "Paid amount",
+    "Importo pagato"
+  ],
+  [
+    "No hay solicitudes con estos filtros.",
+    "No requests match these filters.",
+    "Nessuna richiesta corrisponde a questi filtri."
+  ],
+  [
+    "Evolución mensual",
+    "Monthly trend",
+    "Andamento mensile"
+  ],
+  [
+    "Gastos por categoría",
+    "Expenses by category",
+    "Spese per categoria"
+  ],
+  [
+    "Top 10 empleados",
+    "Top 10 employees",
+    "Primi 10 dipendenti"
+  ],
+  [
+    "Solicitudes por estado",
+    "Requests by status",
+    "Richieste per stato"
+  ],
+  [
+    "Ranking de jefes asignados",
+    "Assigned manager ranking",
+    "Classifica dei responsabili assegnati"
+  ],
+  [
+    "Equipos según la asignación actual. Un empleado con dos jefes aparece en ambos equipos; el total general cuenta cada solicitud una sola vez.",
+    "Teams reflect current assignments. An employee with two managers appears in both teams; each request is counted only once in the overall total.",
+    "I team riflettono le assegnazioni attuali. Un dipendente con due responsabili compare in entrambi i team; il totale generale conta ogni richiesta una sola volta."
+  ],
+  [
+    "Sin datos para mostrar.",
+    "No data to display.",
+    "Nessun dato da mostrare."
+  ],
+  [
+    "Filtrar por este empleado",
+    "Filter by this employee",
+    "Filtra per questo dipendente"
+  ],
+  [
+    "Resumen por empleado",
+    "Employee summary",
+    "Riepilogo per dipendente"
+  ],
+  [
+    "Detalle de solicitudes filtradas",
+    "Filtered request details",
+    "Dettaglio delle richieste filtrate"
+  ],
+  [
+    "Anterior",
+    "Previous",
+    "Precedente"
+  ],
+  [
+    "Siguiente",
+    "Next",
+    "Successivo"
+  ],
+  [
+    "Sin fecha",
+    "No date",
+    "Nessuna data"
+  ],
+  [
+    "Estado no disponible",
+    "Status unavailable",
+    "Stato non disponibile"
+  ],
+  [
+    "No se pudo actualizar el dashboard. Comprueba tu conexión e inténtalo de nuevo.",
+    "The dashboard could not be refreshed. Check your connection and try again.",
+    "Impossibile aggiornare il dashboard. Controlla la connessione e riprova."
+  ]
+];
+  dashboardMessages.push(['Filtrar por este jefe', 'Filter by this manager', 'Filtra per questo responsabile']);
+  for (const [es, en, it] of dashboardMessages) translations.set(es, { en, it });
+  const categoryLimitMessages = [
+  [
+    "Límites por categoría",
+    "Category limits",
+    "Limiti per categoria"
+  ],
+  [
+    "Límite por solicitud, sobre el importe total convertido a EUR. Deja el campo vacío para no aplicar un límite.",
+    "Per-request limit on the total amount converted to EUR. Leave the field empty for no limit.",
+    "Limite per richiesta sull’importo totale convertito in EUR. Lascia il campo vuoto per non applicare un limite."
+  ],
+  [
+    "Los límites son compartidos por Finanzas. Las advertencias usan el límite vigente y no bloquean el envío ni la aprobación del gasto.",
+    "Limits are shared across Finance. Warnings use the current limit and do not block expense submission or approval.",
+    "I limiti sono condivisi da Finanza. Gli avvisi usano il limite vigente e non bloccano l’invio o l’approvazione della spesa."
+  ],
+  [
+    "Actualizar límites",
+    "Refresh limits",
+    "Aggiorna limiti"
+  ],
+  [
+    "No se pueden cargar los límites. Comprueba la conexión, los permisos y que la configuración de límites esté instalada en Supabase.",
+    "Limits could not be loaded. Check your connection, permissions and that category limits have been set up in Supabase.",
+    "Impossibile caricare i limiti. Verifica la connessione, i permessi e la configurazione dei limiti in Supabase."
+  ],
+  [
+    "No se han podido verificar los límites por categoría. Las advertencias no están disponibles; actualiza los datos antes de revisar los gastos.",
+    "Category limits could not be verified. Warnings are unavailable; refresh the data before reviewing expenses.",
+    "Impossibile verificare i limiti per categoria. Gli avvisi non sono disponibili; aggiorna i dati prima di esaminare le spese."
+  ],
+  [
+    "Límite vigente",
+    "Current limit",
+    "Limite vigente"
+  ],
+  [
+    "Sin límite",
+    "No limit",
+    "Nessun limite"
+  ],
+  [
+    "Guardando límite...",
+    "Saving limit...",
+    "Salvataggio del limite..."
+  ],
+  [
+    "Guardar límite",
+    "Save limit",
+    "Salva limite"
+  ],
+  [
+    "Cancelar cambios",
+    "Cancel changes",
+    "Annulla modifiche"
+  ],
+  [
+    "Advertencia de límite",
+    "Limit warning",
+    "Avviso di limite"
+  ],
+  [
+    "Este gasto supera el límite de la categoría.",
+    "This expense exceeds the category limit.",
+    "Questa spesa supera il limite della categoria."
+  ],
+  [
+    "Exceso",
+    "Amount over limit",
+    "Eccedenza"
+  ],
+  [
+    "El aviso no bloquea el envío ni la aprobación.",
+    "This warning does not block submission or approval.",
+    "L’avviso non blocca l’invio o l’approvazione."
+  ],
+  [
+    "Límite guardado y compartido con los demás usuarios de Finanzas.",
+    "Limit saved and shared with the other Finance users.",
+    "Limite salvato e condiviso con gli altri utenti di Finanza."
+  ],
+  [
+    "Escribe un importe en euros entre 0 y 9.999.999.999,99, con un máximo de dos decimales.",
+    "Enter an amount in EUR from 0 to 9,999,999,999.99, with at most two decimal places.",
+    "Inserisci un importo in EUR da 0 a 9.999.999.999,99, con un massimo di due decimali."
+  ],
+  [
+    "Tu sesión no está autorizada para modificar límites. Vuelve a entrar en Finanzas.",
+    "Your session is not authorized to edit limits. Sign in to Finance again.",
+    "La sessione non è autorizzata a modificare i limiti. Accedi nuovamente a Finanza."
+  ],
+  [
+    "Actualiza los límites antes de guardar.",
+    "Refresh the limits before saving.",
+    "Aggiorna i limiti prima di salvare."
+  ],
+  [
+    "Otro usuario cambió este límite. Pulsa Cancelar cambios para cargar el valor vigente y vuelve a editarlo.",
+    "Another user changed this limit. Select Cancel changes to load the current value, then edit it again.",
+    "Un altro utente ha modificato questo limite. Seleziona Annulla modifiche per caricare il valore vigente, poi modificalo di nuovo."
+  ],
+  [
+    "No se pudo guardar el límite. Comprueba la conexión y tus permisos de Finanzas.",
+    "The limit could not be saved. Check your connection and Finance permissions.",
+    "Impossibile salvare il limite. Controlla la connessione e i permessi di Finanza."
+  ],
+  [
+    "No se pudo confirmar el límite guardado. Actualiza los límites antes de continuar.",
+    "The saved limit could not be confirmed. Refresh limits before continuing.",
+    "Impossibile confermare il limite salvato. Aggiorna i limiti prima di continuare."
+  ]
+];
+  for (const [es, en, it] of categoryLimitMessages) translations.set(es, { en, it });
   const fragments = [...translations].sort((a, b) => b[0].length - a[0].length);
   const supported = new Set(['es', 'en', 'it']);
   const storageKey = 'wonderfield.portal.language';
@@ -131,4 +498,5 @@
   observer = new MutationObserver(schedule);
   apply();
 })();
+
 

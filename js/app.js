@@ -11,13 +11,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ESTADO GLOBAL
   // ----------------------------------------------------
   let expenses = [];
+  let expensesOwnerId = null;
+  let financeWorkspaceView = 'queue';
   let currentActiveTab = 'employee'; // 'employee', 'manager', 'finance', 'admin'
   
   let empCurrentFilter = 'all';
   let empSearchQuery = '';
   let empSelectedTrip = '';
 
-  let mgrCurrentSubTab = 'PENDING'; // 'PENDING' | 'HISTORY'
+  let mgrCurrentSubTab = 'PENDING'; // 'PENDING' | 'HISTORY' | 'DASHBOARD'
 
   let finCurrentFilter = 'all';
   let finSearchQuery = '';
@@ -218,6 +220,34 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnCancelPayment = document.getElementById('btnCancelPayment');
   const btnConfirmPayment = document.getElementById('btnConfirmPayment');
 
+  // Read-only analytics share the existing, server-authorized expense snapshot.
+  const managerAnalytics = new window.ExpenseDashboard(document.getElementById('managerAnalytics'), 'manager', refreshAnalytics);
+  const financeAnalytics = new window.ExpenseDashboard(document.getElementById('financeAnalytics'), 'finance', refreshAnalytics);
+  const categoryLimits = window.categoryLimitService;
+  const categoryLimitPanel = new window.CategoryLimitPanel(document.getElementById('financeCategoryLimits'), categoryLimits, loadAllExpenses);
+  async function refreshAnalytics() {
+    await window.authService.refreshDirectory();
+    await loadAllExpenses();
+  }
+  function updateAnalytics(dashboard) {
+    const profile = window.authService.getCurrentProfile();
+    dashboard.update(expensesOwnerId === profile?.id ? expenses : [], profile, window.authService.getUsers());
+  }
+  document.querySelectorAll('.fin-view').forEach(button => {
+    button.addEventListener('click', () => {
+      financeWorkspaceView = button.dataset.view;
+      renderFinanceDashboard();
+    });
+  });
+  window.addEventListener('portal:reauth-required', () => {
+    expenses = []; expensesOwnerId = null;
+    managerAnalytics.clear(); financeAnalytics.clear();
+    categoryLimits.clear(); categoryLimitPanel.clear();
+  });
+  document.addEventListener('portal:language-changed', () => {
+    if (currentActiveTab === 'manager') renderManagerDashboard();
+  });
+
   // Modal Vista Previa Email
   const emailPreviewModal = document.getElementById('emailPreviewModal');
   const btnCloseEmailPreview = document.getElementById('btnCloseEmailPreview');
@@ -322,6 +352,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       managerLoginBox.classList.remove('hidden');
       managerDashboard.classList.add('hidden');
+      managerAnalytics.clear();
+      categoryLimits.clear();
     }
   }
 
@@ -359,6 +391,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       financeLoginBox.classList.remove('hidden');
       financeDashboard.classList.add('hidden');
+      financeAnalytics.clear();
+      categoryLimits.clear(); categoryLimitPanel.clear();
     }
   }
 
@@ -537,7 +571,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   // CARGA GLOBAL DE GASTOS Y CONTADORES
   // ----------------------------------------------------
   async function loadAllExpenses() {
-    expenses = await window.databaseService.getAll();
+    const profile = window.authService.getCurrentProfile();
+    const ownerId = profile?.id || null;
+    // A configuration outage must not block expense submission or its refresh.
+    const [snapshot] = await Promise.all([window.databaseService.getAll(), categoryLimits.load(profile)]);
+    // A fetch started by a previous account must never populate a new session.
+    if (ownerId !== (window.authService.getCurrentProfile()?.id || null)) return;
+    expenses = snapshot;
+    expensesOwnerId = ownerId;
     updateHeaderBadges();
     updateTripDropdowns();
     renderEmployeeView();
@@ -754,6 +795,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   // RENDERIZADO: PESTAÑA 2 (JEFE DIRECTO)
   // ----------------------------------------------------
   function renderManagerDashboard() {
+    updateAnalytics(managerAnalytics);
+    categoryLimits.renderStatus(document.getElementById('mgrLimitsStatus'));
+    const analyticsVisible = mgrCurrentSubTab === 'DASHBOARD';
+    document.getElementById('mgrAnalyticsPanel').classList.toggle('hidden', !analyticsVisible);
+    document.getElementById('mgrQueuePanel').classList.toggle('hidden', analyticsVisible);
+    document.getElementById('managerQueueStats').classList.toggle('hidden', analyticsVisible);
+    mgrCountText.classList.toggle('invisible', analyticsVisible);
+    if (analyticsVisible) return;
     const pendingList = expenses.filter(e => e.status === 'PENDING');
     const approvedList = expenses.filter(e => e.status === 'APPROVED' || e.status === 'PAID');
     const rejectedList = expenses.filter(e => e.status === 'REJECTED');
@@ -786,9 +835,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       const formattedEUR = item.amountEUR.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
       const statusBadge = getStatusBadgeHtml(item);
       const isPending = item.status === 'PENDING';
+      const categoryLimitWarning = categoryLimits.warningHTML(item);
 
       return `
         <div class="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 hover:border-slate-300 shadow-sm space-y-3">
+          ${categoryLimitWarning}
           
           <div class="flex items-start justify-between gap-3">
             <div class="flex items-center gap-2 flex-wrap">
@@ -905,6 +956,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   // RENDERIZADO: PESTAÑA 3 (FINANZAS)
   // ----------------------------------------------------
   function renderFinanceDashboard() {
+    updateAnalytics(financeAnalytics);
+    categoryLimitPanel.render();
+    const analyticsVisible = financeWorkspaceView === 'analytics';
+    const limitsVisible = financeWorkspaceView === 'limits';
+    document.getElementById('financeAnalyticsPanel').classList.toggle('hidden', !analyticsVisible);
+    document.getElementById('financeLimitsPanel').classList.toggle('hidden', !limitsVisible);
+    document.getElementById('financeQueuePanel').classList.toggle('hidden', analyticsVisible || limitsVisible);
+    btnFinanceExportExcel.classList.toggle('hidden', analyticsVisible || limitsVisible);
+    document.querySelectorAll('.fin-view').forEach(button => {
+      const active = button.dataset.view === financeWorkspaceView;
+      button.setAttribute('aria-pressed', String(active));
+      button.classList.toggle('bg-[#433364]', active);
+      button.classList.toggle('text-white', active);
+      button.classList.toggle('bg-slate-100', !active);
+      button.classList.toggle('text-slate-700', !active);
+    });
+    if (analyticsVisible || limitsVisible) return;
     let totalEUR = 0;
     let paidEUR = 0;
     let paidCount = 0;
@@ -1786,5 +1854,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       .replace(/'/g, '&#039;');
   }
 });
+
 
 
