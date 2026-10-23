@@ -186,6 +186,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const admSubTabUsers = document.getElementById('admSubTabUsers');
   const admSectionManagers = document.getElementById('admSectionManagers');
   const admSectionUsers = document.getElementById('admSectionUsers');
+  const admSubTabRequests = document.getElementById('admSubTabRequests');
+  const admSectionRequests = document.getElementById('admSectionRequests');
+  window.adminExpensePanel?.configure({refresh:loadAllExpenses});
 
   const areaManagersTableBody = document.getElementById('areaManagersTableBody');
   const usersTableBody = document.getElementById('usersTableBody');
@@ -250,6 +253,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     managerAnalytics.clear(); financeAnalytics.clear();
     categoryLimits.clear(); categoryLimitPanel.clear();
     batchService.clear(); employeeFolders.clear(); managerFolders.clear(); financeFolders.clear();
+    window.adminExpensePanel?.clear();
   });
   document.addEventListener('portal:language-changed', () => {
     if (currentActiveTab === 'manager') renderManagerDashboard();
@@ -457,6 +461,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   btnAdminLogout.addEventListener('click', async () => {
+    window.adminExpensePanel?.clear();
     await window.authService.logout();
     showToast('Sesión de administrador cerrada', 'info');
     renderAdminView();
@@ -464,6 +469,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Sub-Pestañas de Administrador
   admSubTabManagers.addEventListener('click', () => {
+    admSectionRequests.classList.add('hidden');
+    admSubTabRequests.classList.remove('active','bg-[#433364]','text-white');
     admCurrentSubTab = 'managers';
     admSubTabManagers.className = 'adm-subtab active px-4 py-2 text-xs sm:text-sm font-black rounded-full bg-[#433364] text-white flex items-center gap-2 shadow-sm';
     admSubTabUsers.className = 'adm-subtab px-4 py-2 text-xs sm:text-sm font-bold rounded-full bg-white text-slate-700 hover:bg-slate-100 border border-slate-300 flex items-center gap-2 transition';
@@ -473,6 +480,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   admSubTabUsers.addEventListener('click', () => {
+    admSectionRequests.classList.add('hidden');
+    admSubTabRequests.classList.remove('active','bg-[#433364]','text-white');
     admCurrentSubTab = 'users';
     admSubTabUsers.className = 'adm-subtab active px-4 py-2 text-xs sm:text-sm font-black rounded-full bg-[#433364] text-white flex items-center gap-2 shadow-sm';
     admSubTabManagers.className = 'adm-subtab px-4 py-2 text-xs sm:text-sm font-bold rounded-full bg-white text-slate-700 hover:bg-slate-100 border border-slate-300 flex items-center gap-2 transition';
@@ -481,7 +490,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderUsersTable();
   });
 
+  admSubTabRequests.addEventListener('click', () => {
+    admCurrentSubTab='requests';
+    for(const button of [admSubTabManagers,admSubTabUsers]) {
+      button.className='adm-subtab px-4 py-2 text-xs sm:text-sm font-bold rounded-full bg-white text-slate-700 hover:bg-slate-100 border border-slate-300';
+    }
+    admSubTabRequests.className='adm-subtab active px-4 py-2 text-xs sm:text-sm font-black rounded-full bg-[#433364] text-white';
+    admSectionManagers.classList.add('hidden');admSectionUsers.classList.add('hidden');
+    admSectionRequests.classList.remove('hidden');
+    window.adminExpensePanel?.open();
+  });
+
   function renderAdminDashboard() {
+    if(admCurrentSubTab==='requests') { window.adminExpensePanel?.refresh();return; }
     if (admCurrentSubTab === 'managers') {
       renderAreaManagersTable();
     } else {

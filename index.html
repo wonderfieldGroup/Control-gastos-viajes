@@ -825,7 +825,7 @@
         </div>
 
         <!-- Sub-Pestañas Admin -->
-        <div class="flex items-center gap-2 border-b border-slate-200 pb-2">
+        <div class="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
           <button type="button" id="admSubTabManagers" class="adm-subtab active px-4 py-2 text-xs sm:text-sm font-black rounded-full bg-[#433364] text-white flex items-center gap-2 shadow-sm" data-subtab="managers">
             <i data-lucide="users" class="w-4 h-4 text-[#f5cd33]"></i>
             <span>1. Empleados & Jefes Directos</span>
@@ -835,6 +835,7 @@
             <i data-lucide="key" class="w-4 h-4 text-slate-600"></i>
             <span>2. Usuarios & Contraseñas</span>
           </button>
+          <button type="button" id="admSubTabRequests" class="adm-subtab px-4 py-2 text-xs sm:text-sm font-bold rounded-full bg-white text-slate-700 hover:bg-slate-100 border border-slate-300" data-subtab="requests">3. Solicitudes</button>
         </div>
 
         <!-- SECCIÓN 1: EMPLEADOS -->
@@ -867,6 +868,8 @@
 
           </div>
         </div>
+
+        <section id="admSectionRequests" class="space-y-4 hidden" aria-label="Gestión de solicitudes"></section>
 
         <!-- SECCIÓN 2: USUARIOS Y CONTRASEÑAS -->
         <div id="admSectionUsers" class="space-y-4 hidden">
@@ -1118,7 +1121,7 @@
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none"></div>
 
   <!-- SCRIPTS -->
-    <script src="js/i18n.js?v=20261022-finance-direct-pay"></script>
+    <script src="js/i18n.js?v=20261022-admin-expense-trash"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1"></script>
   <script src="js/services/supabase.js"></script>
   <script src="js/services/exchangeRates.js"></script>
@@ -1128,7 +1131,8 @@
   <script src="js/expenseDashboard.js?v=20261020-analytics"></script>
   <script src="js/categoryLimits.js?v=20261020-category-limits"></script>
     <script src="js/expenseFolders.js?v=20261022-finance-direct-pay"></script>
-  <script src="js/app.js?v=20261022-fortnights"></script>
+  <script src="js/app.js?v=20261022-admin-expense-trash"></script>
+  <script src="js/adminExpenses.js?v=20261022-admin-expense-trash"></script>
   <script src="js/services/adminUsers.js?v=20260922-session-directory"></script>
   <script src="js/adminPanel.js?v=20261012-employee-labels"></script>
   <script src="js/unifiedLogin.js?v=20261012-password-controls"></script>
