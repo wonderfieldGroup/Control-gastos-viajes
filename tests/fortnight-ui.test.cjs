@@ -19,21 +19,32 @@ async function fixture(role='employee'){
  getUser:()=>profile,isEmployeeAuthenticated:()=>profile?.role==='employee',getCurrentEmployee:()=>profile?.role==='employee'?profile:null,
  getBossForEmployee:()=>null,getAreaManagers:()=>[],loginEmployee:async()=>({success:true,employee:profile}),login:async()=>({success:true,user:profile}),logout:async()=>{profile=null;}};
  let rpcCalls=[],offline=false;
- const accessible=()=>rows.filter(e=>profile?.role==='employee'?e.employee_id===profile.id:!e.is_draft);
+ const accessible=()=>rows.filter(e=>!e.removed_at&&(profile?.role==='employee'?e.employee_id===profile.id:profile?.role==='admin'||!e.is_draft));
  w.supabaseClient={from:table=>({
   select:()=>table==='expenses'?{order:async()=>({data:accessible()}),eq:(_key,value)=>({single:async()=>({data:rows.find(e=>e.id===value)})})}:
    table==='expense_batches'?{order:async()=>offline?{error:{code:'PGRST205'}}:{data:batches}}:
    {data:['Alojamiento','Transporte y Vuelos','Comidas y Dietas','Taxi y Movilidad','Kilometraje','Clientes y Comercial','Otros'].map(category=>({category,limit_eur:category==='Comidas y Dietas'?500:null,revision:0}))},
   insert:row=>({select:()=>({single:async()=>{const saved={...row,created_at:new Date().toISOString()};rows.push(saved);return{data:saved};}})})
- }),rpc:async(name,args)=>{rpcCalls.push({name,args});return name==='expense_workflow_today'?{data:'2026-10-22'}:{data:{}};}};
+ }),rpc:async(name,args)=>{
+  rpcCalls.push({name,args});
+  if(name==='admin_list_expense_requests'){
+   const matching=rows.filter(e=>Boolean(e.removed_at)===args.p_deleted&&(!args.p_search||e.reason.toLowerCase().includes(args.p_search.toLowerCase())));
+   return{data:{rows:matching.slice(args.p_offset,args.p_offset+args.p_limit).map(row=>({...row})),total:matching.length}};
+  }
+  if(name==='admin_set_expense_removed'){
+   const row=rows.find(e=>e.id===args.p_id);row.removed_at=args.p_removed?'2026-10-22T13:00:00Z':null;row.removal_reason=args.p_reason;
+   return{data:row.id};
+  }
+  return name==='expense_workflow_today'?{data:'2026-10-22'}:{data:{}};
+ }};
  w.lucide={createIcons(){}};w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};
  w.exchangeRateService={init:async()=>{},rates:{},getCurrencyInfo:()=>({flag:'',name:'Euro'}),getRateToEUR:()=>1,convertToEUR:amount=>({amountEUR:amount,formattedEUR:String(amount)})};
  w.SUPABASE_CONFIG={url:'https://example.supabase.co'};
- for(const f of ['js/i18n.js','js/services/db.js','js/categoryLimits.js','js/expenseDashboard.js','js/expenseFolders.js','js/app.js'])w.eval(source(f));
+ for(const f of ['js/i18n.js','js/services/db.js','js/categoryLimits.js','js/expenseDashboard.js','js/expenseFolders.js','js/adminExpenses.js','js/app.js'])w.eval(source(f));
  w.document.dispatchEvent(new w.Event('DOMContentLoaded'));await tick();
- w.document.getElementById(role==='employee'?'empLoginForm':role==='manager'?'managerLoginForm':'financeLoginForm').dispatchEvent(new w.Event('submit',{cancelable:true}));
+ w.document.getElementById(role==='employee'?'empLoginForm':role==='manager'?'managerLoginForm':role==='admin'?'adminLoginForm':'financeLoginForm').dispatchEvent(new w.Event('submit',{cancelable:true}));
  await tick();
- w.document.getElementById(role==='employee'?'navTabEmployee':role==='manager'?'navTabManager':'navTabFinance').click();await tick();
+ w.document.getElementById(role==='employee'?'navTabEmployee':role==='manager'?'navTabManager':role==='admin'?'navTabAdmin':'navTabFinance').click();await tick();
  return {w,rows,batches,errors,rpcCalls,offline:value=>{offline=value;},setProfile:value=>{profile=value;},close:async()=>{observers.forEach(o=>o.disconnect());await tick();observers.forEach(o=>o.disconnect());w.close();}};
 }
 test('Full employee form saves a private draft, does not submit to manager, and groups by old expense date',async()=>{
@@ -81,6 +92,34 @@ test('Finance direct pay labels translate and paid or rejected rows never have p
  row.status='APPROVED';f.batches[0].phase='PAYMENT';ui.render([row],[row]);assert.ok(ui.root.querySelector('button'));
  ui.clear();assert.deepEqual(f.errors,[]);await f.close();
 });
+test('Admin tab requires a reason and explicit confirmation, removes only the selected request and restores from Trash',async()=>{
+ const f=await fixture('admin'),w=f.w,d=w.document;
+ try {
+ d.getElementById('admSubTabRequests').click();await tick();
+ const panel=d.getElementById('admSectionRequests');assert.equal(panel.classList.contains('hidden'),false);
+ assert.equal(panel.querySelectorAll('article').length,3);
+ assert.equal(f.rpcCalls.filter(c=>c.name==='admin_set_expense_removed').length,0);
+ panel.querySelector('article button').click();
+ let dialog=d.querySelector('[role="dialog"]');assert.match(dialog.textContent,/No se borrarán/);
+ const form=dialog.querySelector('form'),reason=dialog.querySelector('textarea');
+ form.dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();assert.equal(f.rpcCalls.filter(c=>c.name==='admin_set_expense_removed').length,0);
+ assert.match(dialog.querySelector('[role="alert"]').textContent,/entre 3 y 500/);
+ reason.value='Carga de prueba';form.dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();await tick();
+ assert.equal(d.querySelector('[role="dialog"]'),null);assert.equal(panel.querySelectorAll('article').length,2);
+ assert.equal(f.rows.filter(e=>e.removed_at).length,1);assert.equal(f.rows[0].removed_at!==null,true);
+ assert.match(panel.textContent,/Solicitud enviada a la papelera/);
+ const filters=panel.querySelector('form');filters.querySelectorAll('select')[1].value='true';filters.dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
+ assert.equal(panel.querySelectorAll('article').length,1);assert.match(panel.textContent,/Carga de prueba/);
+ panel.querySelector('article button').click();dialog=d.querySelector('[role="dialog"]');dialog.querySelector('textarea').value='Restaurar prueba';dialog.querySelector('form').dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();await tick();
+ assert.equal(f.rows.filter(e=>e.removed_at).length,0);assert.match(panel.textContent,/Solicitud restaurada/);
+ d.getElementById('admSubTabUsers').click();assert.equal(panel.classList.contains('hidden'),true);
+ d.getElementById('admSubTabRequests').click();await tick();w.portalI18n.setLanguage('en');await tick();assert.match(panel.textContent,/Request management/);
+ w.portalI18n.setLanguage('it');await tick();assert.match(panel.textContent,/Gestione delle richieste/);
+ f.setProfile({id:'other',role:'employee',status:'ACTIVE'});await w.adminExpensePanel.open();assert.equal(panel.textContent,'');
+ assert.deepEqual(f.errors,[]);
+ } finally { await f.close(); }
+});
+
 test('Calendar utility rejects invalid dates; folders translate; unavailable workflow fails closed',async()=>{
  const f=await fixture(),w=f.w,d=w.document;
  for(const date of ['2024-02-30','2024-13-01','yesterday','2024-00-10'])assert.throws(()=>w.expensePeriods.period(date));

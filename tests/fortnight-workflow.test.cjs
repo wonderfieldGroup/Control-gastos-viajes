@@ -219,5 +219,88 @@ test('Fortnight workflow: real PostgreSQL, RLS, atomic batches and preserved leg
   assert.equal((await db.query("select to_regprocedure('private.receipt_retention_tick(boolean)')::text r")).rows[0].r,null);
   assert.equal((await db.query("select has_function_privilege('anon','public.pay_expense_batch(uuid,uuid,text,bigint)','execute') b")).rows[0].b,false);
  });
+ await t.test('Admin trash protects receipts, preserves history and excludes removed expenses from bulk review/payment',async()=>{
+  const migration=fs.readdirSync(path.join(root,'supabase/migrations')).find(s=>s.endsWith('_admin_expense_trash.sql'));
+  await db.exec(read('supabase/migrations/'+migration));
+  const list=async(deleted=false,search='',status='ALL',offset=0,limit=25)=>(await db.query('select public.admin_list_expense_requests($1,$2,$3,$4,$5) result',[deleted,search,status,offset,limit])).rows[0].result;
+  const change=(row,removed=true,reason='QA test removal')=>db.query('select public.admin_set_expense_removed($1,$2,$3,$4,$5,$6)',[row.id,removed,reason,row.updated_at,row.batch_revision,row.removal_version]);
+  for(const n of [0,1,2,3,4,5,6,7,9])await as(n,async()=>{
+   await assert.rejects(list(),e=>e.code==='42501');
+   await assert.rejects(change({id:id(40),updated_at:new Date().toISOString()}),e=>e.code==='42501');
+  });
+  // Inactive Admin is denied too. No direct access to private tombstones or view.
+  await db.query('update public.profiles set active=false where id=$1',[id(8)]);
+  await as(8,()=>assert.rejects(list(),e=>e.code==='42501'));
+  await db.query('update public.profiles set active=true where id=$1',[id(8)]);
+  await as(1,()=>assert.rejects(db.query('select * from private.expense_removals'),e=>e.code==='42501'));
+  await as(8,()=>assert.rejects(db.query('select * from private.active_expenses'),e=>e.code==='42501'));
+  // Private draft, old submitted expense and paid folder rows all use the same recoverable action.
+  await as(1,()=>insert(70));await as(1,()=>insert(71));await as(1,()=>insert(72));
+  await as(1,()=>submit([70,71,72],170));await as(2,()=>review(170,70,'APPROVED',0));
+  const row=await as(8,async()=>(await list(false,id(71))).rows[0]);
+  await as(8,()=>change(row));
+  await as(8,()=>assert.rejects(change(row),e=>e.code==='40001'));
+  // Both managers and employee lose visibility, and stale reviewers cannot overwrite removal.
+  for(const n of [1,2,3,4,5,8])await as(n,async()=>assert.equal((await db.query('select * from public.expenses where id=$1',[id(71)])).rows.length,0));
+  await as(3,()=>assert.rejects(review(170,72,'APPROVED',1),e=>e.code==='40001'));
+  await as(3,()=>review(170,null,'APPROVED',2));
+  await as(5,()=>pay(170,null,3));
+  assert.equal((await db.query('select status from public.expenses where id=$1',[id(71)])).rows[0].status,'PENDING');
+  assert.deepEqual((await db.query('select status from public.expenses where id in ($1,$2)',[id(70),id(72)])).rows.map(r=>r.status),['PAID','PAID']);
+  // Restore re-opens manager stage without changing any other row/payment; a repeated restore is stale.
+  const removed=await as(8,async()=>(await list(true,id(71))).rows[0]);
+  await as(8,()=>change(removed,false,'QA restore'));await as(8,()=>assert.rejects(change(removed,false),e=>e.code==='40001'));
+  assert.equal((await db.query('select phase from public.expense_batches where id=$1',[id(170)])).rows[0].phase,'MANAGER');
+  await as(2,()=>review(170,null,'REJECTED',5,'QA not eligible'));
+  const paidBefore=(await db.query('select * from public.expenses where id=$1',[id(40)])).rows[0];
+  const paid=await as(8,async()=>(await list(false,id(40))).rows[0]);await as(8,()=>change(paid));
+  const paidTrash=await as(8,async()=>(await list(true,id(40))).rows[0]);await as(8,()=>change(paidTrash,false));
+  assert.deepEqual((await db.query('select * from public.expenses where id=$1',[id(40)])).rows[0],paidBefore);
+  const paidEvents=(await db.query("select count(*)::int n from public.expense_events where expense_id=$1 and event_type='PAID'",[id(40)])).rows[0].n;assert.equal(paidEvents,1);
+  // Receipts are retained physically, but no new signed URL / overwrite / removal is allowed in Trash.
+  const receiptRow=await as(8,async()=>(await list(false,id(11))).rows[0]);await as(8,()=>change(receiptRow));
+  assert.equal((await db.query('select count(*)::int n from storage.objects')).rows[0].n,1);
+  for(const n of [1,2,3,4,5,8])await as(n,async()=>{
+   assert.equal((await db.query('select * from storage.objects')).rows.length,0);
+   assert.equal((await db.query('delete from storage.objects returning *')).rows.length,0);
+   assert.equal((await db.query('select * from public.expense_events where expense_id=$1',[id(11)])).rows.length,0);
+  });
+  await as(8,async()=>change((await list(true,id(11))).rows[0],false));
+  await as(1,()=>insert(73));const draft=await as(8,async()=>(await list(false,id(73),'DRAFT')).rows[0]);
+  await as(8,()=>assert.rejects(change(draft,true,'x'),e=>e.code==='22023'));
+  await as(8,()=>change(draft));await as(1,()=>assert.rejects(submit([73],173,'INDIVIDUAL'),e=>e.code==='40001'));
+  await as(1,async()=>assert.equal((await db.query('delete from public.expenses where id=$1 returning *',[id(73)])).rows.length,0));
+  await as(8,async()=>{assert.ok((await list(true,'qa EXPENSE')).total>=1);await assert.rejects(list(false,'','ALL',-1),e=>e.code==='22023');});
+  assert.equal((await db.query("select count(*)::int n from private.expense_removal_events where expense_id=$1",[id(40)])).rows[0].n,2);
+  assert.equal((await db.query("select to_regprocedure('private.receipt_retention_tick(boolean)')::text r")).rows[0].r,null);
+  for(const name of ['admin_list_expense_requests(boolean,text,text,integer,integer)','admin_set_expense_removed(uuid,boolean,text,timestamptz,bigint,timestamptz)']){
+   assert.equal((await db.query("select has_function_privilege('anon',$1,'execute') b",['public.'+name])).rows[0].b,false);
+  }
+  // Actual admin DOM -> RPC arguments -> guarded PostgreSQL -> visible success -> Trash -> restore.
+  const {JSDOM}=require(process.env.JSDOM_MODULE||'jsdom');
+  const dom=new JSDOM('<section id="admSectionRequests"></section>',{url:'https://qa.example.invalid',runScripts:'outside-only'}),w=dom.window;
+  w.authService={getCurrentProfile:()=>({id:id(8),role:'admin',status:'ACTIVE'})};
+  w.supabaseClient={rpc:async(name,args)=>{
+   try{const params=Object.values(args);return{data:await as(8,async()=>{
+    const result=await db.query(`select public.${name}(${params.map((_,i)=>'$'+(i+1)).join(',')}) result`,params);return result.rows[0].result;
+   })};}catch(error){return{error};}
+  }};
+  try{
+   w.eval(read('js/adminExpenses.js'));w.adminExpensePanel.configure({refresh:async()=>{}});await w.adminExpensePanel.open();
+   const panel=w.document.getElementById('admSectionRequests'),filter=panel.querySelector('form');
+   filter.querySelector('input').value=id(40);filter.dispatchEvent(new w.Event('submit',{cancelable:true}));
+   const until=async predicate=>{for(let i=0;i<100&&!predicate();i++)await new Promise(resolve=>setTimeout(resolve,10));assert.ok(predicate());};
+   await until(()=>panel.querySelectorAll('article').length===1);
+   panel.querySelector('article button').click();let dialog=w.document.querySelector('[role="dialog"]');
+   assert.match(dialog.textContent,/transferencia bancaria/);dialog.querySelector('textarea').value='QA desde formulario';dialog.querySelector('form').dispatchEvent(new w.Event('submit',{cancelable:true}));
+   await until(()=>!w.document.querySelector('[role="dialog"]')&&panel.textContent.includes('Solicitud enviada a la papelera.'));
+   await as(4,async()=>assert.equal((await db.query('select * from public.expenses where id=$1',[id(40)])).rows.length,0));
+   filter.querySelectorAll('select')[1].value='true';filter.dispatchEvent(new w.Event('submit',{cancelable:true}));
+   await until(()=>panel.querySelector('article button')?.textContent==='Restaurar solicitud');
+   panel.querySelector('article button').click();dialog=w.document.querySelector('[role="dialog"]');dialog.querySelector('textarea').value='QA recuperar';dialog.querySelector('form').dispatchEvent(new w.Event('submit',{cancelable:true}));
+   await until(()=>!w.document.querySelector('[role="dialog"]')&&panel.textContent.includes('Solicitud restaurada.'));
+   assert.deepEqual((await db.query('select * from public.expenses where id=$1',[id(40)])).rows[0],paidBefore);
+  }finally{w.close();}
+ });
  await db.close();
 });
