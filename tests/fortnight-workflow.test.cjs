@@ -173,5 +173,82 @@ test('Fortnight workflow: real PostgreSQL, RLS, atomic batches and preserved leg
   w.authService.getCurrentProfile=()=>null;ui.render(rows,rows);assert.equal(ui.root.textContent,'');
   observers.forEach(o=>o.disconnect());await new Promise(resolve=>setTimeout(resolve,25));observers.forEach(o=>o.disconnect());dom.window.close();
  });
+ await t.test('Prepare retention disabled, with private server-only functions',async()=>{
+  await db.exec(`create role service_role;create schema if not exists extensions;
+   create type extensions.http_header as (field text,value text);
+   create type extensions.http_request as (method text,uri text,headers extensions.http_header[],content_type text,content text);
+   create type extensions.http_response as (status integer,content_type text,headers extensions.http_header[],content text);
+   create function extensions.http_header(text,text) returns extensions.http_header language sql as $$select row($1,$2)::extensions.http_header$$;
+   create table private.mock_http_calls(request extensions.http_request);
+   create schema if not exists vault;create table vault.decrypted_secrets(name text,decrypted_secret text);
+   create function extensions.http(r extensions.http_request) returns extensions.http_response language plpgsql as $$
+   begin
+    insert into private.mock_http_calls values(r);
+    if current_setting('qa.http_mode',true)='fail' then return row(503,'application/json',null,'{}')::extensions.http_response;end if;
+    if current_setting('qa.http_mode',true) is distinct from 'leave_objects' then
+      delete from storage.objects where bucket_id='receipts' and name in (select jsonb_array_elements_text(r.content::jsonb->'prefixes'));
+    end if;
+    return row(200,'application/json',null,'[]')::extensions.http_response;
+   end;$$;`);
+  const file=fs.readdirSync(path.join(root,'supabase/migrations')).find(s=>s.endsWith('_receipt_retention_after_finance_approval.sql'));
+  await db.exec(read('supabase/migrations/'+file).replace('create extension if not exists http with schema extensions;',''));
+  for(const n of [0,1,2,4,8])await as(n,async()=>{
+   await assert.rejects(db.query('select private.receipt_retention_tick(false)'),e=>e.code==='42501');
+   await assert.rejects(db.query('select * from private.receipt_retention_control'),e=>e.code==='42501');
+  });
+  assert.equal((await db.query('select private.receipt_retention_tick(false) as r')).rows[0].r.status,'disabled');
+  assert.equal((await db.query('select count(*)::int n from private.mock_http_calls')).rows[0].n,0);
+ });
+ await t.test('Retention uses Finance approval time, supports PDF and unpaid approved, excludes all other states',async()=>{
+  const makeReceipt=async(n,ext='pdf')=>{
+   await as(1,()=>insert(n));const p=id(1)+'/'+id(n)+'/comprobante.'+ext;
+   await as(1,()=>db.query('update public.expenses set receipt_path=$1,receipt_name=$2,receipt_mime_type=$3 where id=$4',[p,'comprobante.'+ext,ext==='pdf'?'application/pdf':'image/png',id(n)]));
+   await db.query('insert into storage.objects values($1,$2,\'receipts\')',[id(n+300),p]);
+  };
+  for(const n of [40,41,42,43])await makeReceipt(n,n===42?'png':'pdf');
+  await as(1,()=>submit([40,41,43],140));await as(2,()=>review(140,null,'APPROVED',0));
+  await as(4,()=>review(140,40,'APPROVED',1));await as(4,()=>review(140,41,'REJECTED',2,'Incorrect PDF'));
+  await db.query("update public.expenses set finance_decided_at=now()-interval '16 days' where id in ($1,$2)",[id(40),id(41)]);
+  await db.query("update public.expenses set finance_decided_at=now()-interval '14 days' where id=$1",[id(11)]);
+  const due=()=>db.query('select expense_id from private.receipts_due_for_retention()');
+  assert.deepEqual((await due()).rows.map(r=>r.expense_id),[id(40)]);
+  assert.equal((await db.query('select status from public.expenses where id=$1',[id(40)])).rows[0].status,'APPROVED');
+  await db.exec('begin');await db.query("update public.expenses set finance_decided_at=now()-interval '15 days' where id=$1",[id(11)]);
+  assert.ok((await due()).rows.some(r=>r.expense_id===id(11)));await db.exec('rollback');
+  const r=(await db.query('select private.receipt_retention_tick(true) as r')).rows[0].r;
+  assert.equal(r.status,'dry_run');assert.equal(r.eligible_in_batch,1);assert.equal(r.enabled,false);
+  assert.equal((await db.query('select count(*)::int n from private.mock_http_calls')).rows[0].n,0);
+ });
+ await t.test('Retention fails safely without key or on Storage errors and never forges deletion',async()=>{
+  await db.exec('update private.receipt_retention_control set enabled=true');
+  assert.equal((await db.query('select private.receipt_retention_tick(false) as r')).rows[0].r.status,'missing_backend_key');
+  await db.exec("insert into vault.decrypted_secrets values('travel_storage_cleanup_service_role','QA-NOT-A-REAL-KEY-0000000000000000000000');select set_config('qa.http_mode','fail',false)");
+  assert.equal((await db.query('select private.receipt_retention_tick(false) as r')).rows[0].r.status,'storage_http_error');
+  await db.exec("select set_config('qa.http_mode','leave_objects',false)");
+  assert.equal((await db.query('select private.receipt_retention_tick(false) as r')).rows[0].r.status,'incomplete_retry');
+  assert.equal((await db.query('select receipt_removed_at from public.expenses where id=$1',[id(40)])).rows[0].receipt_removed_at,null);
+ });
+ await t.test('Retention removes only due objects through Storage API, preserves finance history and retries idempotently',async()=>{
+  const before=(await db.query('select * from public.expenses where id=$1',[id(40)])).rows[0];
+  await db.exec("select set_config('qa.http_mode','ok',false)");
+  const r=(await db.query('select private.receipt_retention_tick(false) as r')).rows[0].r;assert.equal(r.status,'ok');assert.equal(r.removed,1);
+  const after=(await db.query('select * from public.expenses where id=$1',[id(40)])).rows[0];assert.ok(after.receipt_removed_at);
+  for(const key of Object.keys(before).filter(k=>!['receipt_removed_at','updated_at'].includes(k)))assert.deepEqual(after[key],before[key],key);
+  assert.equal((await db.query('select * from storage.objects where name=$1',[before.receipt_path])).rows.length,0);
+  assert.equal((await db.query('select * from storage.objects where name=$1',[id(1)+'/'+id(41)+'/comprobante.pdf'])).rows.length,1);
+  assert.equal((await db.query('select private.receipt_retention_tick(false) as r')).rows[0].r.removed,0);
+  const audit=(await db.query("select * from public.expense_events where expense_id=$1 and event_type='RECEIPT_REMOVED'",[id(40)])).rows;
+  assert.equal(audit.length,1);
+  const call=(await db.query('select (request).method,(request).uri,(request).content from private.mock_http_calls limit 1')).rows[0];
+  assert.equal(call.method,'DELETE');assert.equal(call.uri,'https://zsdutevrqpwfwsyxbygn.supabase.co/storage/v1/object/receipts');
+  assert.deepEqual(JSON.parse(call.content).prefixes,[before.receipt_path]);
+ });
+ await t.test('Clients cannot falsify retention metadata or recreate removed submitted receipts',async()=>{
+  await as(1,async()=>{
+   await assert.rejects(db.query('update public.expenses set receipt_removed_at=now() where id=$1',[id(42)]),e=>e.code==='42501');
+   await assert.rejects(db.query("insert into storage.objects values($1,$2,'receipts')",[id(800),id(1)+'/'+id(40)+'/comprobante.pdf']),e=>e.code==='42501');
+   const p=id(1)+'/'+id(42)+'/comprobante.jpg';await db.query("insert into storage.objects values($1,$2,'receipts')",[id(801),p]);
+  });
+ });
  await db.close();
 });
