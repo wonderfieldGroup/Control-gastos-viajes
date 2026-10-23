@@ -94,6 +94,10 @@
       parent.append(f);input.focus();
     }
     receipt(parent,e){
+      if(e.receiptRemovedAt){
+        parent.append(node('p',tr('Comprobante eliminado: vencieron los 15 días desde la aprobación de Finanzas.'),'text-xs font-bold text-slate-600'));
+        return;
+      }
       if(!e.receiptImage)return;
       try{
         const url=new URL(e.receiptImage),expected=new URL(window.SUPABASE_CONFIG.url);
@@ -106,6 +110,8 @@
       const box=node('article',undefined,'rounded-2xl border border-slate-200 bg-white p-4 space-y-2');
       const reason=node('h4',e.reason,'font-bold text-slate-900');reason.setAttribute('data-no-i18n','');
       box.append(reason,node('p',`${e.date} · ${tr(e.category)} · ${money([e])}`,'text-sm text-slate-700'));
+      if(e.financeDecision==='APPROVED'&&e.receiptPath&&!e.receiptRemovedAt)
+        box.append(node('p',tr('Fotos y PDF: conservación de 15 días desde la aprobación de Finanzas. Descarga una copia si la necesitas.'),'text-xs text-amber-800'));
       let label=e.isDraft?'Borrador privado':e.status==='PAID'?'Pagado':e.status==='REJECTED'?'Rechazado':e.financeDecision==='APPROVED'?'Validado por Finanzas':e.status==='APPROVED'?'Aprobado por el jefe':'Pendiente del jefe';
       box.append(node('p',tr(label),'text-xs font-bold text-[#433364]'));
       if(e.financeReason||e.rejectionReason){

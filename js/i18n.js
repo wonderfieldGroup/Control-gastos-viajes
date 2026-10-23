@@ -22,6 +22,8 @@
   for (const [es, en, it] of receiptMessages) translations.set(es, { en, it });
   translations.set('🚗 Kilometraje', { en: '🚗 Mileage', it: '🚗 Chilometraggio' });
   translations.set('Kilometraje', { en: 'Mileage', it: 'Chilometraggio' });
+  translations.set('Comprobante eliminado: vencieron los 15 días desde la aprobación de Finanzas.', { en: 'Receipt deleted: 15 days have passed since Finance approval.', it: 'Giustificativo eliminato: sono trascorsi 15 giorni dall’approvazione della Finanza.' });
+  translations.set('Fotos y PDF: conservación de 15 días desde la aprobación de Finanzas. Descarga una copia si la necesitas.', { en: 'Photos and PDFs: retained for 15 days after Finance approval. Download a copy if needed.', it: 'Foto e PDF: conservazione per 15 giorni dall’approvazione della Finanza. Scarica una copia se necessaria.' });
   translations.set('Verificando acceso...', { en: 'Verifying access...', it: 'Verifica dell’accesso...' });
   translations.set('Mostrar', { en: 'Show', it: 'Mostra' });
   translations.set('Ocultar', { en: 'Hide', it: 'Nascondi' });
