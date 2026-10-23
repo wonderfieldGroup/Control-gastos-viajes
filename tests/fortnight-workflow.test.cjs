@@ -156,7 +156,7 @@ test('Fortnight workflow: real PostgreSQL, RLS, atomic batches and preserved leg
   mount();await refresh();
   let d=w.document.querySelector('details[data-key="draft:2024-10-01"]');assert.ok(d);assert.match(d.textContent,/Quincena vencida/);
   assert.equal((await db.query('select batch_id from public.expenses where id=$1',[id(30)])).rows[0].batch_id,null);
-  await click(d,'Enviar carpeta completa al jefe');
+  await click(d,'Enviar carpeta completa al manager');
   const batch=(await db.query('select batch_id from public.expenses where id=$1',[id(30)])).rows[0].batch_id;
   actor=2;mount();await refresh();d=w.document.querySelector(`details[data-key="${batch}"]`);assert.ok(d);assert.equal(d.querySelectorAll('article').length,2);
   await click(d,'Aprobar todos los pendientes');
@@ -301,6 +301,54 @@ test('Fortnight workflow: real PostgreSQL, RLS, atomic batches and preserved leg
    await until(()=>!w.document.querySelector('[role="dialog"]')&&panel.textContent.includes('Solicitud restaurada.'));
    assert.deepEqual((await db.query('select * from public.expenses where id=$1',[id(40)])).rows[0],paidBefore);
   }finally{w.close();}
+ });
+ await t.test('Admin opt-in for Manager/Finance: personal claims, receipts, independent approval and revocation',async()=>{
+  await db.exec(read('supabase/migrations/20261023211718_multi_role_personal_expenses.sql'));
+  for(const n of [2,3,4,5,7])await as(n,async()=>{
+   assert.equal((await db.query('select private.can_report_expenses() allowed')).rows[0].allowed,false);
+   await assert.rejects(insert(800+n,'2024-09-12',n),e=>e.code==='42501');
+  });
+  // No ordinary client can grant itself the capability or change its own approver.
+  await as(4,()=>assert.rejects(db.query('update public.profiles set expense_reporting_enabled=true,direct_boss_id=$1 where id=$2 returning id',[id(2),id(4)]),e=>e.code==='42501'));
+  await assert.rejects(db.query('update public.profiles set expense_reporting_enabled=true where id=$1',[id(4)]));
+  await assert.rejects(db.query('update public.profiles set expense_reporting_enabled=true,direct_boss_id=id where id=$1',[id(4)]));
+  await assert.rejects(db.query('update public.profiles set expense_reporting_enabled=true,direct_boss_id=$1 where id=$2',[id(5),id(4)]));
+  // Profile writes use the server's service role after validating the active Admin.
+  await db.query('update public.profiles set expense_reporting_enabled=true,direct_boss_id=$1 where id=$2',[id(3),id(2)]);
+  await db.query('update public.profiles set expense_reporting_enabled=true,direct_boss_id=$1,secondary_boss_id=$2 where id=$3',[id(2),id(3),id(4)]);
+  const rManager=id(2)+'/'+id(810)+'/comprobante.png',rFinance=id(4)+'/'+id(811)+'/comprobante.pdf';
+  for(const [owner,expense,receipt,mime] of [[2,810,rManager,'image/png'],[4,811,rFinance,'application/pdf']])await as(owner,async()=>{
+   assert.equal((await db.query('select private.can_report_expenses() allowed')).rows[0].allowed,true);
+   await db.query("insert into storage.objects values($1,$2,'receipts')",[id(900+owner),receipt]);
+   await insert(expense,'2024-09-12',owner);
+   await db.query("update public.expenses set receipt_path=$1,receipt_name=$2,receipt_mime_type=$3 where id=$4",[receipt,receipt.split('/').at(-1),mime,id(expense)]);
+  });
+  for(const n of [3,5,7])await as(n,async()=>assert.equal((await db.query('select id from public.expenses where id in ($1,$2)',[id(810),id(811)])).rows.length,0));
+  // Same-name data never changes ownership. Draft edit is still constrained by UUID.
+  await as(2,async()=>assert.equal((await db.query("update public.expenses set reason='No' where id=$1 returning id",[id(811)])).rows.length,0));
+  await as(2,()=>submit([810],820));await as(4,()=>submit([811],821,'INDIVIDUAL'));
+  await as(2,()=>assert.rejects(review(820,null,'APPROVED',0),e=>e.code==='42501'));
+  await as(7,()=>assert.rejects(review(820,null,'APPROVED',0),e=>e.code==='42501'));
+  await as(3,()=>review(820,null,'APPROVED',0));
+  await as(5,()=>pay(820,null,1));
+  await as(3,()=>review(821,null,'APPROVED',0));
+  await as(4,()=>assert.rejects(pay(821,null,1),e=>e.code==='42501'));
+  assert.equal((await db.query('select revision from public.expense_batches where id=$1',[id(821)])).rows[0].revision,1);
+  assert.equal((await db.query('select status from public.expenses where id=$1',[id(811)])).rows[0].status,'APPROVED');
+  await as(5,()=>pay(821,null,1));
+  assert.equal((await db.query('select status from public.expenses where id=$1',[id(811)])).rows[0].status,'PAID');
+  // Disabling affects writes immediately, but history and receipts are retained.
+  await as(2,()=>insert(812,'2024-09-12',2));
+  await db.query('update public.profiles set expense_reporting_enabled=false where id=$1',[id(2)]);
+  await as(2,async()=>{
+   await assert.rejects(insert(813,'2024-09-12',2),e=>e.code==='42501');
+   await assert.rejects(submit([812],822),e=>e.code==='42501');
+   assert.equal((await db.query('select id from public.expenses where id=$1',[id(810)])).rows.length,1);
+  });
+  assert.equal((await db.query('select count(*)::int n from storage.objects where name in ($1,$2)',[rManager,rFinance])).rows[0].n,2);
+  await db.query('update public.profiles set active=false where id=$1',[id(4)]);
+  await as(4,()=>assert.rejects(insert(814,'2024-09-12',4)));
+  assert.equal((await db.query("select has_function_privilege('anon','private.can_report_expenses()','execute') allowed")).rows[0].allowed,false);
  });
  await db.close();
 });

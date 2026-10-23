@@ -2,24 +2,74 @@ const {test}=require('node:test');const assert=require('node:assert/strict');con
 const {JSDOM,VirtualConsole}=require(process.env.JSDOM_MODULE||'jsdom');
 const root=path.join(__dirname,'..'),source=file=>fs.readFileSync(path.join(root,file),'utf8');
 const tick=()=>new Promise(resolve=>setTimeout(resolve,30));
-async function fixture(role='employee'){
+test('Admin modal requires another active Manager when opting in and sends the capability to the server',async()=>{
+ const dom=new JSDOM('<button id="admSubTabUsers">Usuarios</button><section id="admSectionUsers"></section>',{url:'https://qa.example.invalid',runScripts:'outside-only'}),w=dom.window,d=w.document;
+ await new Promise(resolve=>d.addEventListener('DOMContentLoaded',resolve,{once:true}));
+ const users=[{id:'admin',role:'admin',full_name:'Admin',active:true},{id:'boss',role:'manager',full_name:'Director',active:true},{id:'inactive',role:'manager',full_name:'Inactive',active:false},{id:'finance',role:'finance',full_name:'Finance',username:'finance',email:'qa@example.invalid',active:true}];
+ let sent;
+ w.authService={isAuthenticated:()=>true,getCurrentProfile:()=>({role:'admin'}),refreshDirectory:async()=>{}};
+ w.adminUserService={list:async()=>users,update:async(id,payload)=>{sent={id,payload};}};
+ w.HTMLElement.prototype.scrollIntoView=()=>{};
+ try{
+  w.eval(source('js/personalExpenses.js'));w.eval(source('js/adminPanel.js'));
+  d.getElementById('admSubTabUsers').click();await new Promise(resolve=>setTimeout(resolve,1200));
+  d.querySelector('[data-edit="finance"]').click();
+  const form=d.getElementById('adminUserFixForm'),check=form.querySelector('[data-reporting-permission]'),first=d.getElementById('fixBoss');
+  assert.equal(check.checked,false);assert.equal(first.closest('label').hidden,true);
+  check.click();assert.equal(first.required,true);assert.equal(first.closest('label').hidden,false);
+  assert.deepEqual([...first.options].map(o=>o.value),['','boss']);
+  first.value='boss';form.dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
+  assert.equal(sent.id,'finance');assert.equal(sent.payload.expense_reporting_enabled,true);assert.equal(sent.payload.direct_boss_id,'boss');
+  assert.equal(d.getElementById('adminUserModalRoot').textContent,'');
+ }finally{w.close();}
+});
+test('Managers and Finance opt-in navigate to their own form and back without signing in or changing role',async()=>{
+ for(const role of ['manager','finance']){
+  const f=await fixture(role,true),d=f.w.document;
+  const button=d.getElementById(role+'PersonalExpenses');assert.ok(button&&!button.hidden);
+  button.click();await tick();assert.equal(f.w.authService.getCurrentProfile().role,role);
+  assert.equal(d.getElementById('viewEmployee').classList.contains('hidden'),false);
+  const folders=d.getElementById('employeeExpenseFolders');assert.match(folders.textContent,/Only mine/);assert.doesNotMatch(folders.textContent,/QA submitted/);
+  d.getElementById('reasonInput').value='Personal QA';d.getElementById('amountInput').value='20';d.getElementById('amountInput').dispatchEvent(new f.w.Event('input'));
+  d.getElementById('expenseForm').dispatchEvent(new f.w.Event('submit',{cancelable:true}));await tick();
+  assert.equal(f.rows.at(-1).employee_id,role);assert.equal(f.rows.at(-1).is_draft,true);
+  d.getElementById('returnToAssignedPanel').click();await tick();
+  assert.equal(d.getElementById(role==='manager'?'viewManager':'viewFinance').classList.contains('hidden'),false);
+  assert.doesNotMatch(d.getElementById(role+'ExpenseFolders').textContent,/Only mine|Personal QA/);
+  // A server refresh revoking the capability closes the personal workspace.
+  button.click();f.setProfile({...f.w.authService.getCurrentProfile(),expenseReportingEnabled:false});f.w.personalExpenseNavigation.render();await tick();
+  assert.equal(d.getElementById('viewEmployee').classList.contains('hidden'),true);
+  assert.equal(button.hidden,true);assert.deepEqual(f.errors,[]);await f.close();
+ }
+});
+test('Without opt-in Managers/Finance cannot open the employee workspace',async()=>{
+ for(const role of ['manager','finance']){
+  const f=await fixture(role),d=f.w.document;
+  assert.equal(d.getElementById(role+'PersonalExpenses').hidden,true);
+  f.w.portalWorkspace.open('employee');assert.equal(d.getElementById('viewEmployee').classList.contains('hidden'),true);
+  await f.close();
+ }
+});
+async function fixture(role='employee',reporting=false){
  const errors=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
  const dom=new JSDOM(source('index.html'),{runScripts:'outside-only',url:'https://qa.example.invalid',virtualConsole:vc}),w=dom.window;
  await new Promise(resolve=>w.document.addEventListener('DOMContentLoaded',resolve,{once:true}));
  const observers=[],Native=w.MutationObserver;w.MutationObserver=class extends Native{constructor(cb){super(cb);observers.push(this);}};
- let profile={id:role,role,status:'ACTIVE',name:role,email:role+'@example.invalid',directBoss:'QA boss',bossEmail:'boss@example.invalid'};
+ let profile={id:role,role,status:'ACTIVE',expenseReportingEnabled:reporting,name:role,email:role+'@example.invalid',directBoss:'QA boss',bossEmail:'boss@example.invalid'};
  const rows=[{id:'draft',employee_id:'employee',employee:'employee',date:'2024-09-12',reason:'QA draft',category:'Comidas y Dietas',amount_eur:520,is_draft:true,status:'PENDING'},
  {id:'submitted',employee_id:'employee',employee:'employee',date:'2024-09-13',reason:'QA submitted',category:'Comidas y Dietas',amount_eur:520,is_draft:false,status:'PENDING',batch_id:'batch'},
  {id:'legacy',employee_id:'employee',employee:'employee',date:'2024-08-10',reason:'QA legacy',category:'Otros',amount_eur:12,is_draft:false,status:'PENDING'}]
  .map(e=>({trip:'QA',doc_type:'ticket',currency:'EUR',original_amount:e.amount_eur,rate_to_eur:1,has_iva:false,base_eur:e.amount_eur,iva_eur:0,created_at:'2026-10-22T12:00:00Z',...e}));
  const batches=[{id:'batch',employee_id:'employee',period_start:'2024-09-01',period_end:'2024-09-15',mode:'FOLDER',phase:role==='finance'?'FINANCE':'MANAGER',revision:0,released_at:role==='finance'?'2026-10-22T12:00:00Z':null}];
  if(role==='finance')rows[1].status='APPROVED';
+ if(reporting)rows.push({...rows[0],id:'own-draft',employee_id:role,employee:role,reason:'Only mine'});
  const directory=[profile,{id:'employee',role:'employee',name:'employee',email:'employee@example.invalid',directBossId:'manager'}];
  w.authService={getCurrentProfile:()=>profile,getUsers:()=>directory,initialize:async()=>{},refreshDirectory:async()=>{},isAuthenticated:r=>profile?.role===r,
- getUser:()=>profile,isEmployeeAuthenticated:()=>profile?.role==='employee',getCurrentEmployee:()=>profile?.role==='employee'?profile:null,
+ getUser:()=>profile,canReportExpenses:()=>profile?.status==='ACTIVE'&&(profile?.role==='employee'||Boolean(profile?.expenseReportingEnabled)),
+ isEmployeeAuthenticated:()=>profile?.status==='ACTIVE'&&(profile?.role==='employee'||Boolean(profile?.expenseReportingEnabled)),getCurrentEmployee:()=>w.authService.isEmployeeAuthenticated()?profile:null,
  getBossForEmployee:()=>null,getAreaManagers:()=>[],loginEmployee:async()=>({success:true,employee:profile}),login:async()=>({success:true,user:profile}),logout:async()=>{profile=null;}};
  let rpcCalls=[],offline=false;
- const accessible=()=>rows.filter(e=>!e.removed_at&&(profile?.role==='employee'?e.employee_id===profile.id:profile?.role==='admin'||!e.is_draft));
+ const accessible=()=>rows.filter(e=>!e.removed_at&&(e.employee_id===profile?.id||profile?.role==='admin'||profile?.role!=='employee'&&!e.is_draft));
  w.supabaseClient={from:table=>({
   select:()=>table==='expenses'?{order:async()=>({data:accessible()}),eq:(_key,value)=>({single:async()=>({data:rows.find(e=>e.id===value)})})}:
    table==='expense_batches'?{order:async()=>offline?{error:{code:'PGRST205'}}:{data:batches}}:
@@ -40,7 +90,7 @@ async function fixture(role='employee'){
  w.lucide={createIcons(){}};w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};
  w.exchangeRateService={init:async()=>{},rates:{},getCurrencyInfo:()=>({flag:'',name:'Euro'}),getRateToEUR:()=>1,convertToEUR:amount=>({amountEUR:amount,formattedEUR:String(amount)})};
  w.SUPABASE_CONFIG={url:'https://example.supabase.co'};
- for(const f of ['js/i18n.js','js/services/db.js','js/categoryLimits.js','js/expenseDashboard.js','js/expenseFolders.js','js/adminExpenses.js','js/app.js'])w.eval(source(f));
+ for(const f of ['js/i18n.js','js/services/db.js','js/categoryLimits.js','js/expenseDashboard.js','js/expenseFolders.js','js/adminExpenses.js','js/personalExpenses.js','js/app.js'])w.eval(source(f));
  w.document.dispatchEvent(new w.Event('DOMContentLoaded'));await tick();
  w.document.getElementById(role==='employee'?'empLoginForm':role==='manager'?'managerLoginForm':role==='admin'?'adminLoginForm':'financeLoginForm').dispatchEvent(new w.Event('submit',{cancelable:true}));
  await tick();

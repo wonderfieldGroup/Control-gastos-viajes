@@ -58,6 +58,7 @@ active: profile.active,
 region: profile.region,
 direct_boss_id: profile.direct_boss_id,
 secondary_boss_id: profile.secondary_boss_id,
+expense_reporting_enabled: profile.expense_reporting_enabled,
 must_change_password: profile.must_change_password,
 created_at: profile.created_at,
 updated_at: profile.updated_at,
@@ -92,10 +93,18 @@ return bossId;
 async function validBossPair(primary, secondary, targetId) {
  const first = await assertValidBoss(primary, targetId);
  const second = await assertValidBoss(secondary, targetId);
- if (second && (!first || second === first)) throw new Error("Selecciona dos jefes distintos y activos.");
+ if (second && (!first || second === first)) throw new Error("Selecciona dos managers distintos y activos.");
  return { first, second };
 }
 
+
+async function validateReporting(role, enabled, first, second) {
+ if (typeof enabled !== 'boolean') throw new Error('Permiso de gastos no válido.');
+ if (!enabled) return;
+ if (!['manager','finance'].includes(role) || !first) throw new Error('Asigna un manager o director aprobador antes de habilitar los gastos.');
+ const {data,error}=await admin.from('profiles').select('id,role,active').in('id',[first,second].filter(Boolean));
+ if (error || !data?.length || data.some(p=>!p.active || p.role!=='manager')) throw new Error('El aprobador debe tener un perfil Manager activo.');
+}
 
 async function allowLoginAttempt(key, limit) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('portal-login:' + key));
@@ -152,7 +161,7 @@ user.email?.toLowerCase() === "admin@wonderfieldgroup.com" &&
 Boolean(user.email_confirmed_at);
 
 const { data: actor, error: actorError } = await admin.from("profiles")
-.select("id, role, active, direct_boss_id, secondary_boss_id")
+.select("id, role, active, direct_boss_id, secondary_boss_id, expense_reporting_enabled")
 .eq("id", user.id)
 .maybeSingle();
 
@@ -169,7 +178,7 @@ const action = payload.action;
 try {
 if (action === 'get_my_manager' || action === 'get_my_managers') {
   if (!actor?.active) return reply(request, 403, { error: 'Account not authorized' });
-  const ids = actor.role === 'employee' ? [actor.direct_boss_id, actor.secondary_boss_id].filter(Boolean) : [];
+  const ids = (actor.role === 'employee' || actor.expense_reporting_enabled) ? [actor.direct_boss_id, actor.secondary_boss_id].filter(Boolean) : [];
   let managers = [];
   if (ids.length) {
     const { data, error } = await admin.from('profiles').select('id,full_name,email').in('id', ids).eq('active', true).in('role', ['manager', 'admin']);
@@ -197,7 +206,7 @@ if (actor?.role !== "admin" && !isVerifiedAdminIdentity) return reply(request, 4
 
 if (action === "list_users") {
 const { data, error } = await admin.from("profiles")
-.select("id,email,username,full_name,role,active,region,direct_boss_id,secondary_boss_id,must_change_password,created_at,updated_at")
+.select("id,email,username,full_name,role,active,region,direct_boss_id,secondary_boss_id,expense_reporting_enabled,must_change_password,created_at,updated_at")
 .order("full_name", { ascending: true });
 if (error) throw error;
 return reply(request, 200, { users: (data || []).map(publicProfile) });
@@ -215,6 +224,8 @@ if (!/^[A-Za-z0-9._-]{3,60}$/.test(username)) return reply(request, 400, { error
 if (fullName.length < 2 || !allowedRoles.has(role)) return reply(request, 400, { error: "Datos de usuario no válidos." });
 if (!validPassword(payload.temporary_password)) return reply(request, 400, { error: "La contraseña temporal debe tener al menos 8 caracteres e incluir mayúscula, minúscula, número y símbolo." });
 const assignedBosses = await validBossPair(payload.direct_boss_id, payload.secondary_boss_id, null);
+const reportingEnabled = payload.expense_reporting_enabled ?? false;
+await validateReporting(role, reportingEnabled, assignedBosses.first, assignedBosses.second);
 const { data: created, error: createError } = await admin.auth.admin.createUser({
 email,
 password: payload.temporary_password,
@@ -223,9 +234,9 @@ user_metadata: { full_name: fullName },
 });
 if (createError || !created.user) throw createError || new Error("Unable to create user");
 const { data: profile, error: profileError } = await admin.from("profiles")
-.update({ username, full_name: fullName, role, active: true, region, notes, direct_boss_id: assignedBosses.first, secondary_boss_id: assignedBosses.second, must_change_password: true })
+.update({ username, full_name: fullName, role, active: true, region, notes, direct_boss_id: assignedBosses.first, secondary_boss_id: assignedBosses.second, expense_reporting_enabled: reportingEnabled, must_change_password: true })
 .eq("id", created.user.id)
-.select("id,email,username,full_name,role,active,region,direct_boss_id,secondary_boss_id,must_change_password,created_at,updated_at")
+.select("id,email,username,full_name,role,active,region,direct_boss_id,secondary_boss_id,expense_reporting_enabled,must_change_password,created_at,updated_at")
 .single();
 if (profileError) {
 await admin.auth.admin.deleteUser(created.user.id);
@@ -238,7 +249,7 @@ return reply(request, 201, { user: publicProfile(profile) });
 const targetId = cleanText(payload.user_id, 36);
 if (!uuidPattern.test(targetId)) return reply(request, 400, { error: "Usuario no válido." });
 const { data: target, error: targetError } = await admin.from("profiles")
-.select("id,role,active,direct_boss_id,secondary_boss_id")
+.select("id,role,active,direct_boss_id,secondary_boss_id,expense_reporting_enabled")
 .eq("id", targetId)
 .maybeSingle();
 if (targetError || !target) return reply(request, 404, { error: "Usuario no encontrado." });
@@ -253,7 +264,7 @@ const { count: teamCount, error: teamError } = await admin.from("profiles").sele
 if (teamError) throw teamError;
 const { count: secondTeamCount, error: secondTeamError } = await admin.from("profiles").select("id", { count: "exact", head: true }).eq("secondary_boss_id", target.id);
 if (secondTeamError) throw secondTeamError;
-if ((teamCount || 0) > 0 || (secondTeamCount || 0) > 0) return reply(request, 409, { error: "Asigna otro jefe a sus colaboradores antes de eliminar esta cuenta." });
+if ((teamCount || 0) > 0 || (secondTeamCount || 0) > 0) return reply(request, 409, { error: "Asigna otro manager a sus colaboradores antes de eliminar esta cuenta." });
 const { data: auditEntry, error: auditError } = await admin.from("admin_audit_log").insert({ actor_id: actorId, target_user_id: target.id, action: "USER_DELETED", metadata: { role: target.role } }).select("id").single();
 if (auditError) throw auditError;
 const { error: deleteError } = await admin.auth.admin.deleteUser(target.id, false);
@@ -296,11 +307,19 @@ if (Object.hasOwn(payload, "direct_boss_id") || Object.hasOwn(payload, "secondar
  updates.direct_boss_id = assignedBosses.first;
  updates.secondary_boss_id = assignedBosses.second;
 }
+if (Object.hasOwn(payload, "expense_reporting_enabled")) {
+ if (typeof payload.expense_reporting_enabled !== 'boolean') return reply(request,400,{error:'Permiso de gastos no válido.'});
+ updates.expense_reporting_enabled = payload.expense_reporting_enabled;
+}
+const reportingRole = updates.role ?? target.role;
+const reportingEnabled = updates.expense_reporting_enabled ?? target.expense_reporting_enabled;
+await validateReporting(reportingRole, reportingEnabled, Object.hasOwn(updates,'direct_boss_id') ? updates.direct_boss_id : target.direct_boss_id,
+ Object.hasOwn(updates,'secondary_boss_id') ? updates.secondary_boss_id : target.secondary_boss_id);
 if (Object.keys(updates).length === 0) return reply(request, 400, { error: "No hay cambios permitidos." });
 const { data: profile, error } = await admin.from("profiles")
 .update(updates)
 .eq("id", target.id)
-.select("id,email,username,full_name,role,active,region,direct_boss_id,secondary_boss_id,must_change_password,created_at,updated_at")
+.select("id,email,username,full_name,role,active,region,direct_boss_id,secondary_boss_id,expense_reporting_enabled,must_change_password,created_at,updated_at")
 .single();
 if (error) throw error;
 const auditAction = updates.active === false ? "USER_DEACTIVATED" : updates.active === true && !target.active ? "USER_ACTIVATED" : "USER_UPDATED";
