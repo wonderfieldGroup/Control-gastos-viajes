@@ -75,3 +75,17 @@ test('Calendar utility rejects invalid dates; folders translate; unavailable wor
  w.dispatchEvent(new w.CustomEvent('portal:reauth-required'));assert.equal(d.getElementById('employeeExpenseFolders').textContent,'');
  assert.deepEqual(f.errors,[]);await f.close();
 });
+
+test('Deleted receipt marker clears cached URLs and displays translated retention notice',async()=>{
+ const f=await fixture('finance'),w=f.w,d=w.document;let signed=0;
+ w.supabaseClient.storage={from:()=>({createSignedUrl:async()=>{signed++;return {data:{signedUrl:'https://example.supabase.co/storage/v1/object/sign/receipts/qa'}};}})};
+ const row={...f.rows[1],receipt_path:'employee/submitted/comprobante.pdf',receipt_name:'comprobante.pdf',receipt_mime_type:'application/pdf',finance_decision:'APPROVED',finance_decided_at:'2026-10-01T12:00:00Z'};
+ const first=await w.databaseService.toAppExpense(row);assert.ok(first.receiptImage);assert.equal(signed,1);
+ row.receipt_removed_at='2026-10-16T12:00:00Z';const removed=await w.databaseService.toAppExpense(row);
+ assert.equal(removed.receiptImage,null);assert.equal(signed,1);assert.equal(w.databaseService.receiptUrlCache.size,0);
+ const before=d.createElement('div');d.body.append(before);const ui=new w.ExpenseFolders(before,'finance',{refresh:async()=>{}});
+ ui.render([removed],[removed]);assert.match(ui.root.textContent,/Comprobante eliminado/);assert.equal(ui.root.querySelectorAll('a').length,0);
+ w.portalI18n.setLanguage('en');ui.render([removed],[removed]);assert.match(ui.root.textContent,/Receipt deleted/);
+ w.portalI18n.setLanguage('it');ui.render([removed],[removed]);assert.match(ui.root.textContent,/Giustificativo eliminato/);
+ ui.clear();assert.deepEqual(f.errors,[]);await f.close();
+});

@@ -27,7 +27,11 @@ class DatabaseService {
   }
   async toAppExpense(row) {
     let receiptImage = null;
-    if (row.receipt_path) {
+    if (row.receipt_removed_at && row.receipt_path) {
+      const viewerId = window.authService?.getCurrentProfile?.()?.id || '';
+      this.receiptUrlCache.delete(viewerId + ':' + row.receipt_path);
+    }
+    if (row.receipt_path && !row.receipt_removed_at) {
       const viewerId = window.authService?.getCurrentProfile?.()?.id || '';
       const cacheKey = viewerId + ':' + row.receipt_path, cached = this.receiptUrlCache.get(cacheKey);
       if (cached && cached.expiresAt > Date.now()) receiptImage = cached.url;
@@ -45,7 +49,8 @@ class DatabaseService {
       rejectedAt:row.status==='REJECTED'?(row.finance_decided_at||row.approved_at):null,rejectionReason:row.rejection_reason,
       paidAt:row.paid_at,paymentRef:row.payment_ref,createdAt:row.created_at,updatedAt:row.updated_at,
       isDraft:row.is_draft===true,batchId:row.batch_id||null,financeDecision:row.finance_decision||null,
-      financeReason:row.finance_reason||null,correctsExpenseId:row.corrects_expense_id||null};
+      financeReason:row.finance_reason||null,financeDecidedAt:row.finance_decided_at||null,
+      receiptRemovedAt:row.receipt_removed_at||null,correctsExpenseId:row.corrects_expense_id||null};
   }
   toDbExpense(expense, receipt) { return { id: expense.id, employee_id: expense.employeeId, employee: expense.employee, date: expense.date, trip: expense.trip || 'General', reason: expense.reason, category: expense.category, doc_type: expense.docType, currency: expense.currency, original_amount: expense.originalAmount, rate_to_eur: expense.rateToEUR, amount_eur: expense.amountEUR, has_iva: Boolean(expense.hasIva), iva_rate: expense.ivaRate || 0, base_eur: expense.baseEUR || 0, iva_eur: expense.ivaEUR || 0, status: expense.status || 'PENDING', receipt_path: receipt?.path || null, receipt_name: receipt?.name || null, receipt_mime_type: receipt?.mimeType || null, notes: expense.notes || null,corrects_expense_id:expense.correctsExpenseId||null }; }
   async validateReceipt(dataUrl) {
