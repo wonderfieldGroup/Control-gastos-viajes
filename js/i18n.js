@@ -401,6 +401,48 @@
   ]
 ];
   for (const [es, en, it] of categoryLimitMessages) translations.set(es, { en, it });
+  const folderMessages = [
+    ['Guardar borrador en su quincena','Save draft in its fortnight','Salva bozza nella quindicina'],
+    ['Borrador actualizado. Todavía no se ha enviado al jefe.','Draft updated. It has not been sent to the manager yet.','Bozza aggiornata. Non è stata ancora inviata al responsabile.'],
+    ['Borrador guardado en su quincena. Todavía no se ha enviado al jefe.','Draft saved in its fortnight. It has not been sent to the manager yet.','Bozza salvata nella quindicina. Non è stata ancora inviata al responsabile.'],
+    ['Carpetas quincenales y envíos individuales','Fortnight folders and individual submissions','Cartelle quindicinali e invii individuali'],
+    ['Agrupación por fecha del gasto. Al abrir una carpeta se muestran todos sus gastos, aunque solo uno coincida con los filtros.','Grouped by expense date. Opening a folder shows all its expenses, even if only one matches the filters.','Raggruppamento per data della spesa. Aprendo una cartella vengono mostrate tutte le sue spese, anche se solo una corrisponde ai filtri.'],
+    ['Quincena vencida','Fortnight ended','Quindicina conclusa'],['Quincena en curso','Current fortnight','Quindicina in corso'],
+    ['Borradores privados: todavía no se han enviado al jefe.','Private drafts: not yet sent to the manager.','Bozze private: non ancora inviate al responsabile.'],
+    ['Enviar carpeta completa al jefe','Send complete folder to manager','Invia cartella completa al responsabile'],
+    ['Se enviarán todos los borradores de esta quincena:','All drafts in this fortnight will be sent:','Verranno inviate tutte le bozze di questa quindicina:'],
+    ['¿Continuar?','Continue?','Continuare?'],
+    ['La carpeta se puede enviar al terminar la quincena. Cierre según fecha UTC del servidor.','The folder can be sent after the fortnight ends. Cutoff uses the server UTC date.','La cartella può essere inviata al termine della quindicina. Chiusura secondo la data UTC del server.'],
+    ['Máximo 250 gastos por envío. Puedes enviar gastos individualmente.','Maximum 250 expenses per submission. You can send expenses individually.','Massimo 250 spese per invio. Puoi inviare le spese singolarmente.'],
+    ['Borrador privado','Private draft','Bozza privata'],['Pendiente del jefe','Awaiting manager','In attesa del responsabile'],
+    ['Validado por Finanzas','Validated by Finance','Convalidato dalla finanza'],['Aprobado por el jefe','Approved by manager','Approvato dal responsabile'],
+    ['Motivo de rechazo','Rejection reason','Motivo del rifiuto'],['Referencia de pago','Payment reference','Riferimento del pagamento'],
+    ['Ver comprobante','View receipt','Visualizza giustificativo'],['Eliminar borrador','Delete draft','Elimina bozza'],
+    ['¿Eliminar este borrador y su comprobante?','Delete this draft and its receipt?','Eliminare questa bozza e il suo giustificativo?'],
+    ['Enviar gasto individual','Send individual expense','Invia spesa individuale'],
+    ['Este gasto se enviará individualmente al jefe. ¿Continuar?','This expense will be sent individually to the manager. Continue?','Questa spesa sarà inviata singolarmente al responsabile. Continuare?'],
+    ['Crear corrección','Create correction','Crea correzione'],['Corregir gasto rechazado','Correct rejected expense','Correggi spesa rifiutata'],
+    ['Aprobar gasto','Approve expense','Approva spesa'],['¿Aprobar este gasto?','Approve this expense?','Approvare questa spesa?'],
+    ['Rechazar gasto','Reject expense','Rifiuta spesa'],['Registrar pago del gasto','Record expense payment','Registra pagamento della spesa'],
+    ['En revisión del jefe','Under manager review','In revisione dal responsabile'],['En revisión de Finanzas','Under Finance review','In revisione dalla finanza'],
+    ['Pendiente de pago','Awaiting payment','In attesa di pagamento'],['Revisión finalizada','Review completed','Revisione conclusa'],
+    ['Envío individual','Individual submission','Invio individuale'],['Carpeta enviada','Submitted folder','Cartella inviata'],
+    ['Aprobar todos los pendientes','Approve all pending expenses','Approva tutte le spese in attesa'],
+    ['Rechazar todos los pendientes','Reject all pending expenses','Rifiuta tutte le spese in attesa'],
+    ['Se aprobarán todos los pendientes de esta carpeta:','All pending expenses in this folder will be approved:','Verranno approvate tutte le spese in attesa in questa cartella:'],
+    ['Las decisiones anteriores se conservarán. ¿Continuar?','Previous decisions will be preserved. Continue?','Le decisioni precedenti saranno conservate. Continuare?'],
+    ['Motivo de rechazo para todos los pendientes','Rejection reason for all pending expenses','Motivo del rifiuto per tutte le spese in attesa'],
+    ['Registrar pago de todos los aprobados','Record payment of all approved expenses','Registra pagamento di tutte le spese approvate'],
+    ['Finanzas recibirá juntos los aprobados cuando no queden gastos pendientes de revisión.','Finance will receive approved expenses together when no expenses remain pending review.','La finanza riceverà insieme le spese approvate quando non ci saranno più spese da esaminare.'],
+    ['Otro usuario ha modificado esta carpeta. Actualiza y revisa los cambios antes de continuar.','Another user has changed this folder. Refresh and review the changes before continuing.','Un altro utente ha modificato questa cartella. Aggiorna e controlla le modifiche prima di continuare.'],
+    ['Tu perfil no puede realizar esta acción en el estado actual.','Your profile cannot perform this action in the current state.','Il tuo profilo non può eseguire questa azione nello stato attuale.'],
+    ['Revisa los datos, la quincena y que tengas un jefe activo asignado.','Check the data, fortnight and that an active manager is assigned.','Controlla i dati, la quindicina e che sia assegnato un responsabile attivo.'],
+    ['No se pudo completar la operación. Actualiza antes de volver a intentarlo.','Could not complete the operation. Refresh before trying again.','Impossibile completare l’operazione. Aggiorna prima di riprovare.'],
+    ['No se pudo actualizar la lista. Vuelve a cargar la página antes de enviar otra vez.','Could not refresh the list. Reload the page before submitting again.','Impossibile aggiornare l’elenco. Ricarica la pagina prima di inviare di nuovo.'],
+    ['Las carpetas no están disponibles. Actualiza o contacta con el administrador.','Folders are unavailable. Refresh or contact the administrator.','Le cartelle non sono disponibili. Aggiorna o contatta l’amministratore.'],
+    ['Fecha de gasto no válida.','Invalid expense date.','Data della spesa non valida.']
+  ];
+  for (const [es,en,it] of folderMessages) translations.set(es,{en,it});
   const fragments = [...translations].sort((a, b) => b[0].length - a[0].length);
   const supported = new Set(['es', 'en', 'it']);
   const storageKey = 'wonderfield.portal.language';

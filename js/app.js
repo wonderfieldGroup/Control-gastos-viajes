@@ -225,6 +225,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   const financeAnalytics = new window.ExpenseDashboard(document.getElementById('financeAnalytics'), 'finance', refreshAnalytics);
   const categoryLimits = window.categoryLimitService;
   const categoryLimitPanel = new window.CategoryLimitPanel(document.getElementById('financeCategoryLimits'), categoryLimits, loadAllExpenses);
+  const batchService = window.expenseBatchService;
+  let correctionSourceId = null;
+  const folderHooks = {refresh:loadAllExpenses,edit:editExpense,correct:correctExpense};
+  const employeeFolders = new window.ExpenseFolders(empExpenseListContainer,'employee',folderHooks);
+  const managerFolders = new window.ExpenseFolders(mgrListContainer,'manager',folderHooks);
+  const financeFolders = new window.ExpenseFolders(finListContainer,'finance',folderHooks);
   async function refreshAnalytics() {
     await window.authService.refreshDirectory();
     await loadAllExpenses();
@@ -243,9 +249,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     expenses = []; expensesOwnerId = null;
     managerAnalytics.clear(); financeAnalytics.clear();
     categoryLimits.clear(); categoryLimitPanel.clear();
+    batchService.clear(); employeeFolders.clear(); managerFolders.clear(); financeFolders.clear();
   });
   document.addEventListener('portal:language-changed', () => {
     if (currentActiveTab === 'manager') renderManagerDashboard();
+    if (currentActiveTab === 'employee') renderEmployeeView();
+    if (currentActiveTab === 'finance') renderFinanceDashboard();
   });
 
   // Modal Vista Previa Email
@@ -574,7 +583,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const profile = window.authService.getCurrentProfile();
     const ownerId = profile?.id || null;
     // A configuration outage must not block expense submission or its refresh.
-    const [snapshot] = await Promise.all([window.databaseService.getAll(), categoryLimits.load(profile)]);
+    const [snapshot] = await Promise.all([window.databaseService.getAll(), categoryLimits.load(profile), batchService.load(profile)]);
     // A fetch started by a previous account must never populate a new session.
     if (ownerId !== (window.authService.getCurrentProfile()?.id || null)) return;
     expenses = snapshot;
@@ -603,7 +612,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshSharedExpenses(); });
 
   function updateHeaderBadges() {
-    const pendingCount = expenses.filter(e => e.status === 'PENDING').length;
+    const pendingCount = expenses.filter(e => e.status === 'PENDING' && !e.isDraft).length;
     const approvedUnpaidCount = expenses.filter(e => e.status === 'APPROVED').length;
 
     badgePendingManager.textContent = pendingCount;
@@ -642,6 +651,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const isAuth = window.authService.isEmployeeAuthenticated();
 
     if (!isAuth) {
+      employeeFolders.clear();
       // Mostrar formulario de acceso por correo
       empLoginBox.classList.remove('hidden');
       empDashboard.classList.add('hidden');
@@ -678,7 +688,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     myExpenses.forEach(e => {
       totalEUR += (parseFloat(e.amountEUR) || 0);
-      if (e.status === 'PENDING') pendingCount++;
+      if (e.status === 'PENDING' && !e.isDraft) pendingCount++;
       if (e.status === 'APPROVED') approvedCount++;
       if (e.status === 'PAID') paidCount++;
     });
@@ -700,10 +710,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     empFilteredCountText.textContent = `Mostrando ${filtered.length} de ${myExpenses.length} comprobantes tuyos`;
+    const hasNewExpenses = filtered.some(window.expensePeriods.isNew);
+    employeeFolders.render(filtered,myExpenses);
+    filtered = filtered.filter(e=>!window.expensePeriods.isNew(e));
 
     if (filtered.length === 0) {
       empExpenseListContainer.innerHTML = '';
-      empEmptyState.classList.remove('hidden');
+      empEmptyState.classList.toggle('hidden',hasNewExpenses);
       return;
     }
 
@@ -731,7 +744,7 @@ document.addEventListener('DOMContentLoaded', async () => {
            </button>`
         : `<span class="text-[11px] text-slate-400 italic">Sin foto</span>`;
 
-      const canEdit = item.status === 'PENDING';
+      const canEdit = item.isDraft === true;
       const actionsHtml = canEdit
         ? `<div class="flex items-center gap-1">
              <button type="button" class="btn-edit-expense p-1.5 text-slate-500 hover:text-[#433364] hover:bg-slate-100 rounded-full" title="Editar" data-id="${item.id}">
@@ -817,12 +830,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     let displayList = (mgrCurrentSubTab === 'PENDING')
       ? pendingList
       : expenses.filter(e => e.status !== 'PENDING');
+    managerFolders.render(expenses,expenses,mgrCurrentSubTab);
+    const hasNewManagerExpenses = expenses.some(e=>e.batchId);
+    displayList = displayList.filter(e=>!window.expensePeriods.isNew(e));
 
     mgrCountText.textContent = `${displayList.length} solicitudes`;
 
     if (displayList.length === 0) {
       mgrListContainer.innerHTML = '';
-      mgrEmptyState.classList.remove('hidden');
+      mgrEmptyState.classList.toggle('hidden',hasNewManagerExpenses);
       return;
     }
 
@@ -1018,10 +1034,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     finFilteredCountText.textContent = `Mostrando ${filtered.length} de ${expenses.length} registros`;
+    const hasNewFinanceExpenses = filtered.some(e=>e.batchId);
+    financeFolders.render(filtered,expenses);
+    filtered = filtered.filter(e=>!window.expensePeriods.isNew(e));
 
     if (filtered.length === 0) {
       finListContainer.innerHTML = '';
-      finEmptyState.classList.remove('hidden');
+      finEmptyState.classList.toggle('hidden',hasNewFinanceExpenses);
       return;
     }
 
@@ -1589,6 +1608,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       ivaEUR: Math.round(ivaEUR * 100) / 100,
       status: 'PENDING',
       receiptImage: receiptBase64.value || null
+      ,correctsExpenseId: correctionSourceId
     };
 
     expenseSaving = true;
@@ -1596,17 +1616,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       if (expenseIdInput.value) {
         await window.databaseService.update(expenseData);
-        showToast('✅ Gasto actualizado', 'success');
+        showToast('Borrador actualizado. Todavía no se ha enviado al jefe.', 'success');
       } else {
         await window.databaseService.add(expenseData);
         
-        // Comprobar si tiene jefe directo asignado en el directorio
-        const bossInfo = window.authService.getBossForEmployee(currentEmp.email || currentEmp.name);
-        if (bossInfo) {
-          showToast(`🎉 Gasto guardado para revisión de ${bossInfo.directBoss}. Consulta el estado en el portal.`, 'success');
-        } else {
-          showToast('🎉 Gasto enviado a la bandeja de aprobación del jefe', 'success');
-        }
+        showToast('Borrador guardado en su quincena. Todavía no se ha enviado al jefe.', 'success');
         
         if (window.confetti) window.confetti({ particleCount: 30, spread: 50, origin: { y: 0.8 } });
       }
@@ -1631,8 +1645,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     clearExpenseFormError();
     form.reset();
     expenseIdInput.value = '';
+    correctionSourceId = null;
     formTitle.textContent = 'Registrar Gasto de Viaje';
-    btnSubmitText.textContent = 'Enviar Gasto a Aprobación';
+    btnSubmitText.textContent = 'Guardar borrador en su quincena';
     btnCancelEdit.classList.add('hidden');
     
     const currentEmp = window.authService.getCurrentEmployee();
@@ -1685,10 +1700,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   function editExpense(id) {
     const item = expenses.find(e => e.id === id);
     if (!item) return;
+    if (!item.isDraft && item.status !== 'REJECTED') return;
 
     expenseIdInput.value = item.id;
     formTitle.textContent = 'Editar Gasto';
-    btnSubmitText.textContent = 'Actualizar y Reenviar';
+    correctionSourceId = item.correctsExpenseId || null;
+    btnSubmitText.textContent = 'Guardar borrador en su quincena';
     btnCancelEdit.classList.remove('hidden');
 
     employeeInput.value = item.employee || '';
@@ -1730,6 +1747,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     updateFormCalculations();
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function correctExpense(id) {
+    const item = expenses.find(e=>e.id===id);
+    if(!item || item.status!=='REJECTED')return;
+    editExpense(id);
+    expenseIdInput.value='';correctionSourceId=id;
+    formTitle.textContent='Corregir gasto rechazado';
   }
 
   // ----------------------------------------------------
