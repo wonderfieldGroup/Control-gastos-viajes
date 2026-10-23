@@ -5,7 +5,7 @@
   const node=(tag,text,classes='')=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;e.className=classes;return e;};
   const allowed=()=>{const p=window.authService?.getCurrentProfile?.();return p?.role==='admin'&&p.status==='ACTIVE'?p.id:null;};
   const money=n=>new Intl.NumberFormat(window.portalI18n?.locale?.()||'es-ES',{style:'currency',currency:'EUR'}).format(Number(n));
-  const status=r=>r.is_draft?'Borrador privado':({PENDING:'Pendiente del jefe',APPROVED:'Aprobado (Por Pagar)',REJECTED:'Rechazado',PAID:'Pagado'})[r.status]||r.status;
+  const status=r=>r.is_draft?'Borrador privado':({PENDING:'Pendiente del manager',APPROVED:'Aprobado (Por Pagar)',REJECTED:'Rechazado',PAID:'Pagado'})[r.status]||r.status;
   const errorText=e=>e?.code==='40001'?'La solicitud ha cambiado. Actualiza la lista y vuelve a intentarlo.':e?.code==='42501'?'Solo un administrador activo puede gestionar solicitudes.':e?.code==='22023'?'Escribe un motivo de entre 3 y 500 caracteres.':'No se pudo gestionar la solicitud. Comprueba la conexión y vuelve a intentarlo.';
   let owner=null,sequence=0,loading=false,busy=false,root,body,notice,search,state,bin,count,prev,next,modal;
   let filters={deleted:false,search:'',status:'ALL',offset:0},refreshHook=async()=>{},lastResult='';
@@ -19,7 +19,7 @@
     const field=(text,input)=>{const l=node('label',tr(text),'text-xs font-bold space-y-1');input.className='block border rounded-xl p-2 text-sm';l.append(input);form.append(l);return input;};
     search=field('Buscar empleado, motivo o destino',node('input'));search.maxLength=200;search.type='search';
     state=field('Estado',node('select'));
-    for(const [v,t] of [['ALL','Todos'],['DRAFT','Borrador privado'],['PENDING','Pendiente del jefe'],['APPROVED','Aprobado (Por Pagar)'],['REJECTED','Rechazado'],['PAID','Pagado']]){const o=node('option',tr(t));o.value=v;state.append(o);}
+    for(const [v,t] of [['ALL','Todos'],['DRAFT','Borrador privado'],['PENDING','Pendiente del manager'],['APPROVED','Aprobado (Por Pagar)'],['REJECTED','Rechazado'],['PAID','Pagado']]){const o=node('option',tr(t));o.value=v;state.append(o);}
     bin=field('Vista',node('select'));for(const [v,t] of [['false','Solicitudes activas'],['true','Papelera']]){const o=node('option',tr(t));o.value=v;bin.append(o);}
     const filter=button(form,'Filtrar',()=>{});filter.type='submit';
     form.onsubmit=event=>{event.preventDefault();if(busy||loading)return;lastResult='';filters={deleted:bin.value==='true',search:search.value.trim(),status:state.value,offset:0};load();};

@@ -59,7 +59,7 @@
       add(result.categories, row.category || '__none__', row.category || 'Sin categoría', row, amount);
       add(result.states, row.status, statusLabels[row.status] || 'Estado no disponible', row, amount);
       const managers = managersFor(row, directory);
-      for (const id of managers.length ? managers : ['__none__']) add(result.managers, id, id === '__none__' ? 'Sin jefe asignado' : directory.get(id)?.name || 'Jefe no disponible', row, amount);
+      for (const id of managers.length ? managers : ['__none__']) add(result.managers, id, id === '__none__' ? 'Sin manager asignado' : directory.get(id)?.name || 'Manager no disponible', row, amount);
     }
     const rank = map => [...map.values()].sort((a, b) => (sort === 'count' ? b.count - a.count : b.amount - a.amount) || a.label.localeCompare(b.label, locale()));
     return { ...result, people: rank(result.people), months: [...result.months.values()].sort((a, b) => a.id.localeCompare(b.id)), categories: rank(result.categories), managers: rank(result.managers), states: [...result.states.values()] };
@@ -90,7 +90,7 @@
         <div data-team-note class="rounded-xl bg-indigo-50 p-3 text-xs text-[#433364]"></div>
         <section data-person-table></section><section data-details></section>
       </div>`;
-      const fields = [...(this.mode === 'finance' ? [['manager', 'Jefe asignado', 'select']] : []), ['employee', 'Empleado', 'select'], ['from', 'Desde el mes', 'month'], ['to', 'Hasta el mes', 'month'], ['category', 'Categoría', 'select'], ['status', 'Estado', 'select'], ['basis', 'Agrupar las fechas por', 'select'], ['sort', 'Ordenar los rankings por', 'select']];
+      const fields = [...(this.mode === 'finance' ? [['manager', 'Manager asignado', 'select']] : []), ['employee', 'Empleado', 'select'], ['from', 'Desde el mes', 'month'], ['to', 'Hasta el mes', 'month'], ['category', 'Categoría', 'select'], ['status', 'Estado', 'select'], ['basis', 'Agrupar las fechas por', 'select'], ['sort', 'Ordenar los rankings por', 'select']];
       this.controls = {};
       const filters = this.root.querySelector('[data-filters]');
       for (const [key, label, type] of fields) {
@@ -150,8 +150,8 @@
       this.reset.textContent = tr('Limpiar filtros');
       const sorted = entries => entries.sort((a, b) => a[1].localeCompare(b[1], locale()));
       const managerMap = new Map();
-      for (const row of this.rows) for (const id of managersFor(row, this.directory)) managerMap.set(id, this.directory.get(id)?.name || tr('Jefe no disponible'));
-      this.options('manager', [...sorted([...managerMap]), ['__none__', tr('Sin jefe asignado')]], 'Todos los jefes');
+      for (const row of this.rows) for (const id of managersFor(row, this.directory)) managerMap.set(id, this.directory.get(id)?.name || tr('Manager no disponible'));
+      this.options('manager', [...sorted([...managerMap]), ['__none__', tr('Sin manager asignado')]], 'Todos los managers');
       const people = new Map();
       for (const row of this.rows) if (!this.filters.manager || (this.filters.manager === '__none__' ? !managersFor(row, this.directory).length : managersFor(row, this.directory).includes(this.filters.manager))) people.set(employeeKey(row), this.directory.get(row.employeeId)?.name || row.employee || tr('Sin empleado'));
       this.options('employee', sorted([...people]), 'Todos los empleados');
@@ -178,10 +178,10 @@
       this.root.querySelector('[data-csv]').disabled = !rows.length;
       const charts = this.root.querySelector('[data-charts]'); charts.replaceChildren();
       charts.append(this.chart('Evolución mensual', totals.months.map(group => ({ ...group, label: monthLabel(group.id) }))), this.chart('Gastos por categoría', totals.categories.map(group => ({ ...group, label: tr(group.label) }))), this.chart('Top 10 empleados', totals.people.slice(0, 10), 'employee'), this.chart('Solicitudes por estado', totals.states.map(group => ({ ...group, label: tr(group.label) }))));
-      if (this.mode === 'finance') charts.append(this.chart('Ranking de jefes asignados', totals.managers, 'manager'));
+      if (this.mode === 'finance') charts.append(this.chart('Ranking de managers asignados', totals.managers, 'manager'));
       const teamNote = this.root.querySelector('[data-team-note]');
       teamNote.classList.toggle('hidden', this.mode !== 'finance');
-      teamNote.textContent = tr('Equipos según la asignación actual. Un empleado con dos jefes aparece en ambos equipos; el total general cuenta cada solicitud una sola vez.');
+      teamNote.textContent = tr('Equipos según la asignación actual. Un empleado con dos managers aparece en ambos equipos; el total general cuenta cada solicitud una sola vez.');
       this.peopleTable(totals.people);
       this.details(rows);
     }
@@ -193,7 +193,7 @@
       const countMode = this.filters.sort === 'count', max = Math.max(1, ...groups.map(group => countMode ? group.count : group.amount));
       for (const group of groups) {
         const item = make('div'), line = make('div', 'mb-1 flex items-start justify-between gap-3 text-xs');
-        const label = make(filterKey ? 'button' : 'span', 'min-w-0 break-words text-left font-bold text-slate-700', group.label, filterKey ? { type: 'button', title: tr(filterKey === 'manager' ? 'Filtrar por este jefe' : 'Filtrar por este empleado') } : {});
+        const label = make(filterKey ? 'button' : 'span', 'min-w-0 break-words text-left font-bold text-slate-700', group.label, filterKey ? { type: 'button', title: tr(filterKey === 'manager' ? 'Filtrar por este manager' : 'Filtrar por este empleado') } : {});
         if (filterKey) label.onclick = () => { this.filters[filterKey] = group.id; if (filterKey === 'manager') this.filters.employee = ''; this.page = 0; this.render(); };
         line.append(label, make('span', 'shrink-0 font-bold text-[#433364]', `${money(group.amount)} · ${number(group.count)}`));
         const track = make('div', 'h-2 overflow-hidden rounded-full bg-slate-100', undefined, { 'aria-hidden': 'true' });
@@ -218,7 +218,7 @@
     details(rows) {
       const sorted = [...rows].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(a.id).localeCompare(String(b.id)));
       const pages = Math.max(1, Math.ceil(rows.length / this.pageSize)); this.page = Math.min(this.page, pages - 1);
-      const section = this.table('Detalle de solicitudes filtradas', ['Fecha del gasto', 'Empleado', 'Jefes asignados', 'Categoría', 'Estado', 'Importe solicitado', 'Motivo / Concepto del Gasto'], sorted.slice(this.page * this.pageSize, (this.page + 1) * this.pageSize).map(row => [row.date || tr('Sin fecha'), this.directory.get(row.employeeId)?.name || row.employee || tr('Sin empleado'), managersFor(row, this.directory).map(id => this.directory.get(id)?.name || tr('Jefe no disponible')).join(' / ') || tr('Sin jefe asignado'), tr(row.category || 'Sin categoría'), tr(statusLabels[row.status] || 'Estado no disponible'), money(cents(row.amountEUR)), row.reason || '']), '[data-details]');
+      const section = this.table('Detalle de solicitudes filtradas', ['Fecha del gasto', 'Empleado', 'Managers asignados', 'Categoría', 'Estado', 'Importe solicitado', 'Motivo / Concepto del Gasto'], sorted.slice(this.page * this.pageSize, (this.page + 1) * this.pageSize).map(row => [row.date || tr('Sin fecha'), this.directory.get(row.employeeId)?.name || row.employee || tr('Sin empleado'), managersFor(row, this.directory).map(id => this.directory.get(id)?.name || tr('Manager no disponible')).join(' / ') || tr('Sin manager asignado'), tr(row.category || 'Sin categoría'), tr(statusLabels[row.status] || 'Estado no disponible'), money(cents(row.amountEUR)), row.reason || '']), '[data-details]');
       const nav = make('div', 'mt-3 flex items-center justify-between gap-2 text-xs');
       const previous = make('button', 'rounded-full border border-slate-300 bg-white px-3 py-2 disabled:opacity-40', tr('Anterior'), { type: 'button' }); previous.disabled = this.page === 0;
       const next = make('button', 'rounded-full border border-slate-300 bg-white px-3 py-2 disabled:opacity-40', tr('Siguiente'), { type: 'button' }); next.disabled = this.page >= pages - 1;
@@ -226,8 +226,8 @@
       nav.append(previous, make('span', '', `${this.page + 1} / ${pages}`), next); section.append(nav);
     }
     csv() {
-      const header = ['Empleado', 'Fecha del gasto', 'Fecha de registro (UTC)', 'Jefes asignados', 'Categoría', 'Estado', 'Importe solicitado', 'Moneda', 'Motivo / Concepto del Gasto'];
-      const rows = this.filtered.map(row => [this.directory.get(row.employeeId)?.name || row.employee || tr('Sin empleado'), row.date || '', row.createdAt || '', managersFor(row, this.directory).map(id => this.directory.get(id)?.name || tr('Jefe no disponible')).join(' / '), tr(row.category || 'Sin categoría'), tr(statusLabels[row.status] || 'Estado no disponible'), new Intl.NumberFormat(locale(), { useGrouping: false, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(cents(row.amountEUR) / 100), 'EUR', row.reason || '']);
+      const header = ['Empleado', 'Fecha del gasto', 'Fecha de registro (UTC)', 'Managers asignados', 'Categoría', 'Estado', 'Importe solicitado', 'Moneda', 'Motivo / Concepto del Gasto'];
+      const rows = this.filtered.map(row => [this.directory.get(row.employeeId)?.name || row.employee || tr('Sin empleado'), row.date || '', row.createdAt || '', managersFor(row, this.directory).map(id => this.directory.get(id)?.name || tr('Manager no disponible')).join(' / '), tr(row.category || 'Sin categoría'), tr(statusLabels[row.status] || 'Estado no disponible'), new Intl.NumberFormat(locale(), { useGrouping: false, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(cents(row.amountEUR) / 100), 'EUR', row.reason || '']);
       return '\uFEFF' + [header.map(tr), ...rows].map(row => row.map(csvCell).join(';')).join('\r\n');
     }
     download() {

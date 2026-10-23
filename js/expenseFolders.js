@@ -18,7 +18,7 @@
   function metadata(name,text,record=false){const span=node('span',undefined,'expense-card-meta-item');span.append(icon(name),node('span',text));if(record)span.setAttribute('data-no-i18n','');return span;}
   function badge(label,tone='neutral'){const b=node('span',tr(label),'expense-card-badge');b.dataset.tone=tone;return b;}
   function expenseStatus(e){
-    return e.isDraft?['Borrador privado','neutral']:e.status==='PAID'?['Pagado','paid']:e.status==='REJECTED'?['Rechazado','rejected']:e.status==='APPROVED'?['Aprobado (Por Pagar)','approved']:['Pendiente del jefe','pending'];
+    return e.isDraft?['Borrador privado','neutral']:e.status==='PAID'?['Pagado','paid']:e.status==='REJECTED'?['Rechazado','rejected']:e.status==='APPROVED'?['Aprobado (Por Pagar)','approved']:['Pendiente del manager','pending'];
   }
   function dateLabel(date){
     return new Intl.DateTimeFormat(window.portalI18n?.locale?.()||'es-ES',{day:'2-digit',month:'2-digit',year:'numeric',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
@@ -36,7 +36,7 @@
   function message(error) {
     if (String(error?.code)==='40001') return tr('Otro usuario ha modificado esta carpeta. Actualiza y revisa los cambios antes de continuar.');
     if (String(error?.code)==='42501') return tr('Tu perfil no puede realizar esta acción en el estado actual.');
-    if (String(error?.code)==='22023') return tr('Revisa los datos, la quincena y que tengas un jefe activo asignado.');
+    if (String(error?.code)==='22023') return tr('Revisa los datos, la quincena y que tengas un manager activo asignado.');
     return tr('No se pudo completar la operación. Actualiza antes de volver a intentarlo.');
   }
   class ExpenseBatchService {
@@ -148,16 +148,16 @@
       if(this.role==='employee'&&e.isDraft){
         this.button(actions,'Editar',()=>this.hooks.edit(e.id));
         this.button(actions,'Eliminar borrador',()=>this.run(()=>window.databaseService.delete(e.id),tr('¿Eliminar este borrador y su comprobante?')),true);
-        this.button(actions,'Enviar gasto individual',()=>this.run(()=>this.service.submit([e],'INDIVIDUAL'),tr('Este gasto se enviará individualmente al jefe. ¿Continuar?')));
+        this.button(actions,'Enviar gasto individual',()=>this.run(()=>this.service.submit([e],'INDIVIDUAL'),tr('Este gasto se enviará individualmente al manager. ¿Continuar?')));
       }
       if(this.role==='employee'&&e.status==='REJECTED')this.button(actions,'Crear corrección',()=>this.hooks.correct(e.id));
       if(batch){
-        const canReview=this.role==='manager'&&batch.phase==='MANAGER'&&e.status==='PENDING';
+        const canReview=this.role==='manager'&&batch.employee_id!==window.authService.getCurrentProfile().id&&batch.phase==='MANAGER'&&e.status==='PENDING';
         if(canReview){
           this.button(actions,'Aprobar gasto',()=>this.run(()=>this.service.review(batch,e,'APPROVED'),tr('¿Aprobar este gasto?')));
           this.button(actions,'Rechazar gasto',()=>this.inputAction(box,'Motivo de rechazo',500,reason=>this.service.review(batch,e,'REJECTED',reason)),true);
         }
-        if(this.role==='finance'&&['FINANCE','PAYMENT'].includes(batch.phase)&&e.status==='APPROVED'&&e.financeDecision!=='REJECTED')
+        if(this.role==='finance'&&batch.employee_id!==window.authService.getCurrentProfile().id&&['FINANCE','PAYMENT'].includes(batch.phase)&&e.status==='APPROVED'&&e.financeDecision!=='REJECTED')
           this.button(actions,'Marcar como Pagado',()=>this.paymentAction(box,batch,e,[e]),false,true);
       }
       box.append(footer);parent.append(box);
@@ -168,7 +168,7 @@
       const header=node('span',undefined,'expense-card-header'),badges=node('span',undefined,'expense-card-badges');
       const type=badge(individual?'Envío individual':'CARPETA','document');type.prepend(icon(individual?'receipt':'folder'));badges.append(type);
       const state=draft?[expired?'Quincena vencida':'Quincena en curso',expired?'pending':'neutral']:
-        batch.phase==='MANAGER'?['En revisión del jefe','pending']:['FINANCE','PAYMENT'].includes(batch.phase)?['Pendiente de pago','approved']:
+        batch.phase==='MANAGER'?['En revisión del manager','pending']:['FINANCE','PAYMENT'].includes(batch.phase)?['Pendiente de pago','approved']:
         rows.every(e=>e.status==='PAID')?['Pagado','paid']:rows.every(e=>e.status==='REJECTED')?['Rechazado','rejected']:['Revisión finalizada','neutral'];
       badges.append(badge(...state));
       const trips=[...new Set(rows.map(e=>e.trip).filter(Boolean))];if(trips.length)badges.append(metadata('pin',trips.length===1?trips[0]:tr('Varios destinos'),trips.length===1));
@@ -184,7 +184,7 @@
     }
     render(filtered,all,view='all'){
       const profile=window.authService?.getCurrentProfile?.();
-      if(!profile||profile.role!==this.role||profile.status!=='ACTIVE'){this.clear();return;}
+      if(!profile||(this.role==='employee' ? !(window.authService.canReportExpenses?.() ?? profile.role==='employee') : profile.role!==this.role)||profile.status!=='ACTIVE'){this.clear();return;}
       if(this.identity && this.identity!==profile.id)this.clear();this.identity=profile.id;
       this.snapshot=[filtered,all,view];if(this.busy||this.editing)return;
       const fingerprint=JSON.stringify([filtered,all,this.service.rows,this.service.status,this.service.today,view,this.error,window.portalI18n?.getLanguage?.()]);
@@ -224,15 +224,15 @@
           if(draft){
             const expired=end<this.service.today;
             content.append(node('p',tr(expired?'Quincena vencida':'Quincena en curso'),'font-bold '+(expired?'text-amber-800':'text-[#433364]')),
-              node('p',tr('Borradores privados: todavía no se han enviado al jefe.'),'text-sm text-slate-600'));
-            const button=this.button(content,'Enviar carpeta completa al jefe',()=>this.run(()=>this.service.submit(rows,'FOLDER'),tr('Se enviarán todos los borradores de esta quincena:')+' '+rows.length+' · '+money(rows)+'. '+tr('¿Continuar?')));
+              node('p',tr('Borradores privados: todavía no se han enviado al manager.'),'text-sm text-slate-600'));
+            const button=this.button(content,'Enviar carpeta completa al manager',()=>this.run(()=>this.service.submit(rows,'FOLDER'),tr('Se enviarán todos los borradores de esta quincena:')+' '+rows.length+' · '+money(rows)+'. '+tr('¿Continuar?')));
             button.disabled=!expired;button.title=tr('La carpeta se puede enviar al terminar la quincena. Cierre según fecha UTC del servidor.');
             if(rows.length>250){button.disabled=true;content.append(node('p',tr('Máximo 250 gastos por envío. Puedes enviar gastos individualmente.'),'text-sm text-amber-800'));}
           }else{
-            const phases={MANAGER:'En revisión del jefe',FINANCE:'Pendiente de pago',PAYMENT:'Pendiente de pago',CLOSED:'Revisión finalizada'};
+            const phases={MANAGER:'En revisión del manager',FINANCE:'Pendiente de pago',PAYMENT:'Pendiente de pago',CLOSED:'Revisión finalizada'};
             content.append(node('p',tr(batch.mode==='INDIVIDUAL'?'Envío individual':'Carpeta enviada')+' · '+tr(phases[batch.phase]||batch.phase),'text-sm font-bold text-[#433364]'));
             const pending=rows.filter(e=>e.status==='PENDING');
-            const canReview=this.role==='manager'&&batch.phase==='MANAGER';
+            const canReview=this.role==='manager'&&batch.employee_id!==profile.id&&batch.phase==='MANAGER';
             if(canReview&&pending.length){
               const actions=node('div',undefined,'flex flex-wrap gap-2');
               this.button(actions,'Aprobar todos los pendientes',()=>this.run(()=>this.service.review(batch,null,'APPROVED'),tr('Se aprobarán todos los pendientes de esta carpeta:')+' '+pending.length+' · '+money(pending)+'. '+tr('Las decisiones anteriores se conservarán. ¿Continuar?')));
@@ -240,7 +240,7 @@
               content.append(actions);
             }
             const payable=rows.filter(e=>e.status==='APPROVED'&&e.financeDecision!=='REJECTED');
-            if(this.role==='finance'&&['FINANCE','PAYMENT'].includes(batch.phase)&&payable.length)
+            if(this.role==='finance'&&batch.employee_id!==window.authService.getCurrentProfile().id&&['FINANCE','PAYMENT'].includes(batch.phase)&&payable.length)
               this.button(content,'Marcar carpeta como Pagada',()=>this.paymentAction(content,batch,null,payable),false,true);
             if(this.role==='manager'&&batch.phase==='MANAGER')content.append(node('p',tr('Finanzas recibirá juntos los aprobados cuando no queden gastos pendientes de revisión.'),'text-xs text-slate-600'));
           }

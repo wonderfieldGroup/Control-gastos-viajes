@@ -1,6 +1,6 @@
 /**
  * The Wonderfield Group - Sistema Corporativo de Gastos de Viaje
- * Controlador con 4 módulos: Empleado (por correo), Jefe Directo, Finanzas y Administrador
+ * Controlador con 4 módulos: Empleado (por correo), Manager Directo, Finanzas y Administrador
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const empFilteredCountText = document.getElementById('empFilteredCountText');
 
   // ----------------------------------------------------
-  // ELEMENTOS: VISTA JEFE DIRECTO
+  // ELEMENTOS: VISTA MANAGER DIRECTO
   // ----------------------------------------------------
   const managerLoginBox = document.getElementById('managerLoginBox');
   const managerDashboard = document.getElementById('managerDashboard');
@@ -240,7 +240,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   function updateAnalytics(dashboard) {
     const profile = window.authService.getCurrentProfile();
-    dashboard.update(expensesOwnerId === profile?.id ? expenses : [], profile, window.authService.getUsers());
+    dashboard.update(expensesOwnerId === profile?.id ? queueExpenses(dashboard.mode) : [], profile, window.authService.getUsers());
   }
   document.querySelectorAll('.fin-view').forEach(button => {
     button.addEventListener('click', () => {
@@ -297,7 +297,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ----------------------------------------------------
   // NAVEGACIÓN ENTRE PESTAÑAS (THE WONDERFIELD GROUP)
   // ----------------------------------------------------
+  function queueExpenses(role) {
+    const profile = window.authService.getCurrentProfile();
+    return expenses.filter(e => !e.isDraft && (role === 'manager' ? e.employeeId !== profile?.id :
+      (!e.batchId || batchService.rows.some(b => b.id === e.batchId && b.released_at)) &&
+      (['APPROVED','PAID'].includes(e.status) || e.financeDecision === 'REJECTED')));
+  }
   function switchTab(tabName) {
+    const profile = window.authService.getCurrentProfile();
+    if (profile && (tabName === 'employee' ? !window.authService.isEmployeeAuthenticated() : !window.authService.isAuthenticated(tabName))) return;
     currentActiveTab = tabName;
 
     Object.keys(navTabs).forEach(key => {
@@ -319,8 +327,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (tabName === 'admin') renderAdminView();
     if (tabName === 'employee') renderEmployeeView();
 
+    window.personalExpenseNavigation?.render();
     lucide.createIcons();
   }
+  window.portalWorkspace = { open: switchTab, current: () => currentActiveTab };
 
   Object.keys(navTabs).forEach(key => {
     navTabs[key].addEventListener('click', () => switchTab(key));
@@ -352,7 +362,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ----------------------------------------------------
-  // AUTENTICACIÓN: JEFE DIRECTO
+  // AUTENTICACIÓN: MANAGER DIRECTO
   // ----------------------------------------------------
   function renderManagerView() {
     const isAuth = window.authService.isAuthenticated('manager');
@@ -511,7 +521,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ----------------------------------------------------
-  // TABLA: EMPLEADOS & JEFES DIRECTOS (ADMIN)
+  // TABLA: EMPLEADOS & MANAGERS DIRECTOS (ADMIN)
   // ----------------------------------------------------
   function renderAreaManagersTable() {
     const list = window.authService.getAreaManagers();
@@ -561,7 +571,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!item) return;
 
     const subject = `[The Wonderfield Group] Gasto pendiente de aprobación - ${item.name}`;
-    const body = `Estimado/a ${item.directBoss},\n\nLe informamos que el/la Empleado ${item.name} (${item.region}) ha registrado un nuevo comprobante de gasto de viaje internacional pendiente de su autorización en The Wonderfield Group.\n\nDetalles:\n• Solicitante: ${item.name}\n• Región / Marca: ${item.region}\n• Estado: Pendiente de Aprobación por Jefatura\n\nPor favor ingrese al sistema corporativo en el módulo "2. Aprobación Jefe Directo" para revisar el comprobante y autorizar la liquidación contable.\n\nAtentamente,\nThe Wonderfield Group • Travel & Expense Management\n"Where good things come from."`;
+    const body = `Estimado/a ${item.directBoss},\n\nLe informamos que el/la Empleado ${item.name} (${item.region}) ha registrado un nuevo comprobante de gasto de viaje internacional pendiente de su autorización en The Wonderfield Group.\n\nDetalles:\n• Solicitante: ${item.name}\n• Región / Marca: ${item.region}\n• Estado: Pendiente de Aprobación por Manager\n\nPor favor ingrese al sistema corporativo en el módulo "2. Aprobación Manager Directo" para revisar el comprobante y autorizar la liquidación contable.\n\nAtentamente,\nThe Wonderfield Group • Travel & Expense Management\n"Where good things come from."`;
 
     previewEmailTo.textContent = item.bossEmail;
     previewEmailSubject.textContent = subject;
@@ -601,8 +611,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // CARGA GLOBAL DE GASTOS Y CONTADORES
   // ----------------------------------------------------
   async function loadAllExpenses() {
+    await window.authService.refreshDirectory();
     const profile = window.authService.getCurrentProfile();
     const ownerId = profile?.id || null;
+    window.personalExpenseNavigation?.render();
     // A configuration outage must not block expense submission or its refresh.
     const [snapshot] = await Promise.all([window.databaseService.getAll(), categoryLimits.load(profile), batchService.load(profile)]);
     // A fetch started by a previous account must never populate a new session.
@@ -633,8 +645,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshSharedExpenses(); });
 
   function updateHeaderBadges() {
-    const pendingCount = expenses.filter(e => e.status === 'PENDING' && !e.isDraft).length;
-    const approvedUnpaidCount = expenses.filter(e => e.status === 'APPROVED').length;
+    const pendingCount = queueExpenses('manager').filter(e => e.status === 'PENDING').length;
+    const approvedUnpaidCount = queueExpenses('finance').filter(e => e.status === 'APPROVED').length;
 
     badgePendingManager.textContent = pendingCount;
     mgrSubBadgePending.textContent = pendingCount;
@@ -689,18 +701,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     badgeActiveEmployee.classList.remove('hidden');
 
     currentEmpName.textContent = currentEmp.name;
-    currentEmpDetails.textContent = `${currentEmp.email} • 📍 ${currentEmp.region} • 👔 Jefe Directo: ${currentEmp.directBoss} (${currentEmp.bossEmail})`;
+    currentEmpDetails.textContent = `${currentEmp.email} • 📍 ${currentEmp.region} • 👔 Manager Directo: ${currentEmp.directBoss} (${currentEmp.bossEmail})`;
     
     // Autoasignar nombre en formulario
     employeeInput.value = currentEmp.name;
-    detectedBossInfo.textContent = `👔 Jefe Directo asignado: ${currentEmp.directBoss} (${currentEmp.bossEmail})`;
+    detectedBossInfo.textContent = `👔 Manager Directo asignado: ${currentEmp.directBoss} (${currentEmp.bossEmail})`;
 
     // FILTRAR ESTRICTAMENTE SOLO LOS GASTOS DE ESTE EMPLEADO
-    const myExpenses = expenses.filter(e => {
-      const matchName = (e.employee || '').trim().toLowerCase() === currentEmp.name.trim().toLowerCase();
-      const matchEmail = (e.employeeEmail || '').trim().toLowerCase() === currentEmp.email.trim().toLowerCase();
-      return matchName || matchEmail;
-    });
+    const myExpenses = expenses.filter(e => e.employeeId === currentEmp.id);
 
     let totalEUR = 0;
     let pendingCount = 0;
@@ -801,7 +809,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
           ${item.status === 'REJECTED' && item.rejectionReason ? `
             <div class="p-3 bg-rose-50 rounded-2xl text-xs text-[#de4f5f] border border-rose-200">
-              <strong>Motivo de rechazo por tu Jefe:</strong> ${escapeHtml(item.rejectionReason)}
+              <strong>Motivo de rechazo por tu Manager:</strong> ${escapeHtml(item.rejectionReason)}
             </div>
           ` : ''}
 
@@ -826,10 +834,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ----------------------------------------------------
-  // RENDERIZADO: PESTAÑA 2 (JEFE DIRECTO)
+  // RENDERIZADO: PESTAÑA 2 (MANAGER DIRECTO)
   // ----------------------------------------------------
   function renderManagerDashboard() {
+    const expenses = queueExpenses('manager');
     updateAnalytics(managerAnalytics);
+    window.personalExpenseNavigation?.render();
     categoryLimits.renderStatus(document.getElementById('mgrLimitsStatus'));
     const analyticsVisible = mgrCurrentSubTab === 'DASHBOARD';
     document.getElementById('mgrAnalyticsPanel').classList.toggle('hidden', !analyticsVisible);
@@ -929,7 +939,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               </div>
             ` : `
               <div class="text-xs text-slate-600 font-medium">
-                ${item.status === 'APPROVED' || item.status === 'PAID' ? `✅ Aprobado por ${escapeHtml(item.approvedBy || 'Jefe')}` : `❌ Rechazado por ${escapeHtml(item.approvedBy || 'Jefe')}`}
+                ${item.status === 'APPROVED' || item.status === 'PAID' ? `✅ Aprobado por ${escapeHtml(item.approvedBy || 'Manager')}` : `❌ Rechazado por ${escapeHtml(item.approvedBy || 'Manager')}`}
               </div>
             `}
           </div>
@@ -993,7 +1003,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // RENDERIZADO: PESTAÑA 3 (FINANZAS)
   // ----------------------------------------------------
   function renderFinanceDashboard() {
+    const expenses = queueExpenses('finance');
     updateAnalytics(financeAnalytics);
+    window.personalExpenseNavigation?.render();
     categoryLimitPanel.render();
     const analyticsVisible = financeWorkspaceView === 'analytics';
     const limitsVisible = financeWorkspaceView === 'limits';
@@ -1073,7 +1085,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const formattedOrig = item.originalAmount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const formattedEUR = item.amountEUR.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
       const statusBadge = getStatusBadgeHtml(item);
-      const canPay = item.status === 'APPROVED';
+      const canPay = item.status === 'APPROVED' && item.employeeId !== window.authService.getCurrentProfile()?.id;
       const isPaid = item.status === 'PAID';
 
       return `
@@ -1131,7 +1143,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                   <i data-lucide="credit-card" class="w-3.5 h-3.5"></i> Marcar como Pagado
                 </button>
               ` : ''}
-              ${item.status === 'PENDING' ? `<span class="text-xs text-[#de4f5f] font-bold">Esperando aprobación de jefatura</span>` : ''}
+              ${item.status === 'PENDING' ? `<span class="text-xs text-[#de4f5f] font-bold">Esperando aprobación de manager</span>` : ''}
               ${item.status === 'REJECTED' ? `<span class="text-xs text-red-600 font-bold">Gasto rechazado</span>` : ''}
             </div>
           </div>
@@ -1191,7 +1203,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const filterLabel = finCurrentFilter === 'all' ? 'Todos los registros' : `Estado: ${finCurrentFilter}`;
-    window.excelExportService.exportToExcel(expenses, finSelectedTrip, filterLabel);
+    window.excelExportService.exportToExcel(queueExpenses('finance'), finSelectedTrip, filterLabel);
     showToast('📊 Reporte contable de The Wonderfield Group descargado en Excel (.xlsx)', 'success');
 
     if (window.confetti) {
@@ -1200,7 +1212,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ----------------------------------------------------
-  // MODAL DE RECHAZO (JEFE)
+  // MODAL DE RECHAZO (MANAGER)
   // ----------------------------------------------------
   function openRejectModal(id) {
     rejectExpenseId.value = id;
@@ -1301,7 +1313,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     switch (item.status) {
       case 'PENDING':
         return `<span class="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-[11px] font-black bg-amber-50 text-amber-900 border border-amber-300">
-                  <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-600"></i> Pendiente Jefe
+                  <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-600"></i> Pendiente Manager
                 </span>`;
       case 'APPROVED':
         return `<span class="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-[11px] font-black bg-indigo-50 text-[#433364] border border-indigo-200">
@@ -1637,11 +1649,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       if (expenseIdInput.value) {
         await window.databaseService.update(expenseData);
-        showToast('Borrador actualizado. Todavía no se ha enviado al jefe.', 'success');
+        showToast('Borrador actualizado. Todavía no se ha enviado al manager.', 'success');
       } else {
         await window.databaseService.add(expenseData);
         
-        showToast('Borrador guardado en su quincena. Todavía no se ha enviado al jefe.', 'success');
+        showToast('Borrador guardado en su quincena. Todavía no se ha enviado al manager.', 'success');
         
         if (window.confetti) window.confetti({ particleCount: 30, spread: 50, origin: { y: 0.8 } });
       }
