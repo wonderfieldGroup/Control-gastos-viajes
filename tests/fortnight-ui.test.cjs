@@ -120,6 +120,31 @@ test('Admin tab requires a reason and explicit confirmation, removes only the se
  } finally { await f.close(); }
 });
 
+test('All three role views use accessible card summaries, preserve expanded state and safely render details',async()=>{
+ for(const role of ['employee','manager','finance']){
+  const f=await fixture(role),w=f.w,d=w.document;
+  try{
+   const root=d.getElementById(role+'ExpenseFolders'),card=root.querySelector('details'),summary=card.querySelector('summary');
+   assert.equal(card.className,'expense-folder-card');assert.equal(summary.className,'expense-folder-summary');
+   assert.ok(summary.querySelector('.expense-card-amount strong'));assert.ok(summary.querySelector('.expense-card-meta'));
+   assert.match(summary.textContent,/CARPETA/);assert.match(summary.textContent,/Ver detalle/);
+   assert.equal(summary.querySelector('button'),null);assert.equal(card.open,false);
+   assert.ok(card.querySelector('.expense-folder-content article.expense-item-card'));
+   card.open=true;f.rows[0].updated_at='2026-10-23T00:00:00Z';
+   if(role==='employee')d.getElementById('empSearchInput')?.dispatchEvent(new w.Event('input'));
+   const before=d.createElement('div');d.body.append(before);const ui=new w.ExpenseFolders(before,role,{refresh:async()=>{}});
+   const row={id:'safe',employeeId:role==='employee'?role:'employee',employee:'<img src=x onerror=alert(1)>',batchId:'batch',reason:'<script>bad()</script>',trip:'<b>test</b>',date:'2024-09-12',category:'Comidas y Dietas',amountEUR:400,docType:'factura',status:role==='finance'?'APPROVED':'PENDING'};
+   ui.render([row],[row]);const folder=ui.root.querySelector('details');folder.open=true;row.amountEUR=500;ui.render([row],[row]);
+   assert.equal(ui.root.querySelector('details').open,true);assert.match(ui.root.querySelector('summary').textContent,/500,00/);
+   assert.equal(ui.root.querySelector('img,script,b'),null);assert.match(ui.root.textContent,/<script>bad/);
+   assert.equal(ui.root.querySelectorAll('summary svg[aria-hidden="true"]').length,6);
+   w.portalI18n.setLanguage('en');ui.render([row],[row]);assert.match(ui.root.querySelector('summary').textContent,/View details/);
+   w.portalI18n.setLanguage('it');ui.render([row],[row]);assert.match(ui.root.querySelector('summary').textContent,/Visualizza dettagli/);
+   assert.deepEqual(f.errors,[]);ui.clear();
+  }finally{await f.close();}
+ }
+});
+
 test('Calendar utility rejects invalid dates; folders translate; unavailable workflow fails closed',async()=>{
  const f=await fixture(),w=f.w,d=w.document;
  for(const date of ['2024-02-30','2024-13-01','yesterday','2024-00-10'])assert.throws(()=>w.expensePeriods.period(date));
