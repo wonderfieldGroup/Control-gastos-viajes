@@ -125,6 +125,62 @@ input::placeholder, textarea::placeholder {
   color: #94a3b8 !important;
 }
 
+/* Shared folder/item cards: same hierarchy as individual expense cards. */
+.expense-folder-card, .expense-item-card {
+  min-width: 0; border: 1px solid #dce3ef; border-radius: 24px;
+  background: #fff; box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
+}
+.expense-folder-card { transition: border-color .2s; }
+.expense-folder-card:hover { border-color: #bdc8db; }
+.expense-folder-summary { display: block; padding: 22px 24px 16px; cursor: pointer; list-style: none; }
+.expense-folder-summary::-webkit-details-marker { display: none; }
+.expense-folder-summary::marker { content: ''; }
+.expense-folder-summary:focus-visible { outline: 3px solid #433364; outline-offset: 3px; border-radius: 24px; }
+.expense-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; margin-bottom: 18px; }
+.expense-card-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.expense-card-badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px; border: 1px solid #dce3ef; border-radius: 999px; font-size: 11px; font-weight: 800; line-height: 1.5; color: #475569; background: #f8fafc; }
+.expense-card-badge svg { width: 13px; height: 13px; flex: none; }
+.expense-card-badge[data-tone="invoice"], .expense-card-badge[data-tone="rejected"] { background: #fff1f2; border-color: #fecdd3; color: #be2941; }
+.expense-card-badge[data-tone="document"], .expense-card-badge[data-tone="approved"] { background: #eef2ff; border-color: #c7d2fe; color: #433364; }
+.expense-card-badge[data-tone="pending"] { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+.expense-card-badge[data-tone="paid"] { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
+.expense-card-amount { display: flex; flex-direction: column; gap: 4px; text-align: right; flex: 0 0 auto; }
+.expense-card-amount strong { font-size: 23px; font-weight: 900; line-height: 1.2; color: #0f172a; }
+.expense-card-original { font-size: 10px; color: #64748b; font-family: ui-monospace, monospace; line-height: 1.5; }
+.expense-card-title { display: block; margin: 0 0 5px; font-size: 15px; font-weight: 800; line-height: 1.45; color: #0f172a; overflow-wrap: anywhere; }
+.expense-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 18px; font-size: 12px; line-height: 1.5; color: #475569; }
+.expense-card-meta-item { display: inline-flex; gap: 6px; align-items: center; min-width: 0; overflow-wrap: anywhere; }
+.expense-card-meta-item svg { width: 14px; height: 14px; flex: none; color: #796590; }
+.expense-card-meta-item span { min-width: 0; overflow-wrap: anywhere; }
+.expense-card-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid #edf1f7; }
+.expense-folder-counts { display: inline-flex; flex-wrap: wrap; gap: 6px 16px; font-size: 11px; line-height: 1.5; color: #64748b; }
+.expense-folder-toggle { display: inline-flex; align-items: center; gap: 8px; color: #433364; font-size: 12px; font-weight: 800; }
+.expense-folder-toggle svg { width: 16px; height: 16px; transition: transform .18s; }
+.expense-folder-hide { display: none; }
+.expense-folder-card[open] > summary .expense-folder-show { display: none; }
+.expense-folder-card[open] > summary .expense-folder-hide { display: inline; }
+.expense-folder-card[open] > summary .expense-folder-toggle svg { transform: rotate(90deg); }
+.expense-folder-content { padding: 18px 24px 24px; border-top: 1px solid #edf1f7; background: #f8fafc; border-radius: 0 0 24px 24px; }
+.expense-folder-content > * + * { margin-top: 12px; }
+.expense-item-card { padding: 18px 20px; }
+.expense-card-receipt { font-size: 12px; }
+.expense-card-no-receipt { color: #7c8da8; font-size: 11px; font-style: italic; }
+.expense-card-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.expense-card-action:disabled { cursor: not-allowed; opacity: .5; }
+@media (max-width: 540px) {
+  .expense-folder-summary { padding: 18px 16px 14px; }
+  .expense-card-header { gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .expense-card-amount { margin-left: auto; }
+  .expense-card-amount strong { font-size: 21px; }
+  .expense-card-badges { flex: 1 1 170px; }
+  .expense-card-meta { gap: 7px 12px; }
+  .expense-folder-content { padding: 16px 12px; }
+  .expense-item-card { padding: 16px 14px; }
+  .expense-card-actions { justify-content: flex-start; }
+  .expense-card-action { max-width: 100%; white-space: normal; }
+}
+@media (prefers-reduced-motion: reduce) { .expense-folder-card, .expense-folder-toggle svg { transition: none; } }
+
 /* Impresión */
 @media print {
   .no-print {

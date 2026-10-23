@@ -9,6 +9,20 @@
   };
   const money = rows => new Intl.NumberFormat(window.portalI18n?.locale?.() || 'es-ES', {style:'currency',currency:'EUR'})
     .format(rows.reduce((sum,e)=>sum+Math.round(Number(e.amountEUR)*100),0)/100);
+  const icons={folder:'M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z',user:'M20 21v-2a7 7 0 0 0-14 0v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',calendar:'M8 2v4 M16 2v4 M3 10h18 M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z',pin:'M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',tag:'M20 13l-7 7a2 2 0 0 1-3 0L2 12V2h10l8 8a2 2 0 0 1 0 3Z M7 7h.01',chevron:'m9 5 7 7-7 7',receipt:'M4 3h16v18l-4-2-4 2-4-2-4 2V3Z M8 8h8 M8 12h8'};
+  function icon(name){
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    for(const [key,value] of Object.entries({viewBox:'0 0 24 24',fill:'none',stroke:'currentColor','stroke-width':'1.8','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true',focusable:'false'}))svg.setAttribute(key,value);
+    const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',icons[name]);svg.append(path);return svg;
+  }
+  function metadata(name,text,record=false){const span=node('span',undefined,'expense-card-meta-item');span.append(icon(name),node('span',text));if(record)span.setAttribute('data-no-i18n','');return span;}
+  function badge(label,tone='neutral'){const b=node('span',tr(label),'expense-card-badge');b.dataset.tone=tone;return b;}
+  function expenseStatus(e){
+    return e.isDraft?['Borrador privado','neutral']:e.status==='PAID'?['Pagado','paid']:e.status==='REJECTED'?['Rechazado','rejected']:e.status==='APPROVED'?['Aprobado (Por Pagar)','approved']:['Pendiente del jefe','pending'];
+  }
+  function dateLabel(date){
+    return new Intl.DateTimeFormat(window.portalI18n?.locale?.()||'es-ES',{day:'2-digit',month:'2-digit',year:'numeric',timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
+  }
   function period(date) {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date));
     if (!match) throw new Error('Fecha de gasto no válida.');
@@ -80,7 +94,7 @@
       }
     }
     button(parent,label,fn,danger=false,success=false){
-      const b=node('button',tr(label),'rounded-xl border px-3 py-2 text-xs font-bold '+(danger?'border-rose-300 text-rose-700':success?'border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800':'border-slate-300 text-[#433364]'));
+      const b=node('button',tr(label),'expense-card-action rounded-full border px-4 py-2 text-xs font-black '+(danger?'border-rose-300 text-rose-700':success?'border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800':'border-slate-300 text-[#433364]'));
       b.type='button';b.addEventListener('click',fn);parent.append(b);return b;
     }
     inputAction(parent,label,max,fn,options={}){
@@ -110,11 +124,15 @@
       }catch(_){/* Never turn an untrusted receipt string into a link. */}
     }
     expense(parent,e,batch){
-      const box=node('article',undefined,'rounded-2xl border border-slate-200 bg-white p-4 space-y-2');
-      const reason=node('h4',e.reason,'font-bold text-slate-900');reason.setAttribute('data-no-i18n','');
-      box.append(reason,node('p',`${e.date} · ${tr(e.category)} · ${money([e])}`,'text-sm text-slate-700'));
-      let label=e.isDraft?'Borrador privado':e.status==='PAID'?'Pagado':e.status==='REJECTED'?'Rechazado':e.status==='APPROVED'?'Aprobado (Por Pagar)':'Pendiente del jefe';
-      box.append(node('p',tr(label),'text-xs font-bold text-[#433364]'));
+      const box=node('article',undefined,'expense-item-card');
+      const header=node('div',undefined,'expense-card-header'),badges=node('div',undefined,'expense-card-badges');
+      badges.append(badge(e.docType==='factura'?'FACTURA':'TICKET',e.docType==='factura'?'invoice':'document'),badge(...expenseStatus(e)));
+      if(e.trip)badges.append(metadata('pin',e.trip,true));
+      const amount=node('div',undefined,'expense-card-amount');amount.append(node('strong',money([e])));
+      if(e.currency&&Number.isFinite(Number(e.originalAmount)))amount.append(node('span',new Intl.NumberFormat(window.portalI18n?.locale?.()||'es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(e.originalAmount))+' '+e.currency,'expense-card-original'));
+      header.append(badges,amount);box.append(header);
+      const reason=node('h4',e.reason,'expense-card-title');reason.setAttribute('data-no-i18n','');box.append(reason);
+      const meta=node('div',undefined,'expense-card-meta');meta.append(metadata('user',e.employee,true),metadata('tag',tr(e.category)),metadata('calendar',dateLabel(e.date)));box.append(meta);
       if(e.financeReason||e.rejectionReason){
         const rejection=node('p',undefined,'text-sm font-bold text-rose-700');
         const text=node('span',e.financeReason||e.rejectionReason);text.setAttribute('data-no-i18n','');
@@ -124,7 +142,9 @@
       if(this.role==='manager'&&window.categoryLimitService){
         const warning=node('div');warning.innerHTML=window.categoryLimitService.warningHTML(e);box.prepend(warning);
       }
-      const actions=node('div',undefined,'flex flex-wrap items-center gap-3');this.receipt(actions,e);
+      const footer=node('div',undefined,'expense-card-footer'),receipt=node('div',undefined,'expense-card-receipt');this.receipt(receipt,e);
+      if(!e.receiptImage)receipt.append(node('span',tr('Sin comprobante'),'expense-card-no-receipt'));
+      const actions=node('div',undefined,'expense-card-actions');footer.append(receipt,actions);
       if(this.role==='employee'&&e.isDraft){
         this.button(actions,'Editar',()=>this.hooks.edit(e.id));
         this.button(actions,'Eliminar borrador',()=>this.run(()=>window.databaseService.delete(e.id),tr('¿Eliminar este borrador y su comprobante?')),true);
@@ -140,7 +160,27 @@
         if(this.role==='finance'&&['FINANCE','PAYMENT'].includes(batch.phase)&&e.status==='APPROVED'&&e.financeDecision!=='REJECTED')
           this.button(actions,'Marcar como Pagado',()=>this.paymentAction(box,batch,e,[e]),false,true);
       }
-      box.append(actions);parent.append(box);
+      box.append(footer);parent.append(box);
+    }
+    summary(details,rows,draft,batch,start,end){
+      const individual=batch?.mode==='INDIVIDUAL',expired=draft&&end<this.service.today;
+      const summary=node('summary',undefined,'expense-folder-summary');
+      const header=node('span',undefined,'expense-card-header'),badges=node('span',undefined,'expense-card-badges');
+      const type=badge(individual?'Envío individual':'CARPETA','document');type.prepend(icon(individual?'receipt':'folder'));badges.append(type);
+      const state=draft?[expired?'Quincena vencida':'Quincena en curso',expired?'pending':'neutral']:
+        batch.phase==='MANAGER'?['En revisión del jefe','pending']:['FINANCE','PAYMENT'].includes(batch.phase)?['Pendiente de pago','approved']:
+        rows.every(e=>e.status==='PAID')?['Pagado','paid']:rows.every(e=>e.status==='REJECTED')?['Rechazado','rejected']:['Revisión finalizada','neutral'];
+      badges.append(badge(...state));
+      const trips=[...new Set(rows.map(e=>e.trip).filter(Boolean))];if(trips.length)badges.append(metadata('pin',trips.length===1?trips[0]:tr('Varios destinos'),trips.length===1));
+      const amount=node('span',undefined,'expense-card-amount');amount.append(node('strong',money(rows)),node('span',tr(individual?'Total en EUR':'Total de la carpeta'),'expense-card-original'));header.append(badges,amount);summary.append(header);
+      const title=node('span',individual?rows[0]?.reason:tr('Gastos de la quincena'),'expense-card-title');if(individual)title.setAttribute('data-no-i18n','');summary.append(title);
+      const meta=node('span',undefined,'expense-card-meta');meta.append(metadata('user',rows[0]?.employee||'',true),metadata('calendar',individual?dateLabel(rows[0].date):dateLabel(start)+' — '+dateLabel(end)));
+      const categories=[...new Set(rows.map(e=>e.category))];if(categories.length)meta.append(metadata('tag',tr(categories.length===1?categories[0]:'Varias categorías')));summary.append(meta);
+      const footer=node('span',undefined,'expense-card-footer'),counts=node('span',undefined,'expense-folder-counts');
+      counts.append(node('span',rows.length+' '+tr(rows.length===1?'gasto':'gastos')));
+      const receipts=rows.filter(e=>e.receiptImage||e.receiptPath).length;counts.append(node('span',receipts+' / '+rows.length+' '+tr('Comprobantes adjuntos')));
+      const toggle=node('span',undefined,'expense-folder-toggle');toggle.append(node('span',tr('Ver detalle'),'expense-folder-show'),node('span',tr('Ocultar detalle'),'expense-folder-hide'),icon('chevron'));
+      footer.append(counts,toggle);summary.append(footer);details.append(summary);
     }
     render(filtered,all,view='all'){
       const profile=window.authService?.getCurrentProfile?.();
@@ -178,36 +218,33 @@
         for(const {draft,batch,items} of groups){
           const rows=draft?.items||items, start=draft?.start||batch.period_start,end=draft?.end||batch.period_end;
           const key=draft?'draft:'+start:batch.id;
-          const details=node('details',undefined,'rounded-2xl border border-slate-300 bg-white p-4 space-y-3');details.dataset.key=key;details.open=open.has(key);
-          const summary=node('summary',`${start} — ${end} · ${rows[0]?.employee||''} · ${rows.length} · ${money(rows)}`,'cursor-pointer font-bold text-slate-900');
-          summary.setAttribute('data-no-i18n','');
-          summary.append(node('span',tr(draft?(end<this.service.today?'Quincena vencida':'Quincena en curso'):
-            batch.mode==='INDIVIDUAL'?'Envío individual':'Carpeta enviada'),'ml-2 inline-block rounded-full bg-amber-50 px-2 py-1 text-xs font-bold text-amber-900'));
-          details.append(summary);
+          const details=node('details',undefined,'expense-folder-card');details.dataset.key=key;details.open=open.has(key);
+          this.summary(details,rows,draft,batch,start,end);
+          const content=node('div',undefined,'expense-folder-content');details.append(content);
           if(draft){
             const expired=end<this.service.today;
-            details.append(node('p',tr(expired?'Quincena vencida':'Quincena en curso'),'font-bold '+(expired?'text-amber-800':'text-[#433364]')),
+            content.append(node('p',tr(expired?'Quincena vencida':'Quincena en curso'),'font-bold '+(expired?'text-amber-800':'text-[#433364]')),
               node('p',tr('Borradores privados: todavía no se han enviado al jefe.'),'text-sm text-slate-600'));
-            const button=this.button(details,'Enviar carpeta completa al jefe',()=>this.run(()=>this.service.submit(rows,'FOLDER'),tr('Se enviarán todos los borradores de esta quincena:')+' '+rows.length+' · '+money(rows)+'. '+tr('¿Continuar?')));
+            const button=this.button(content,'Enviar carpeta completa al jefe',()=>this.run(()=>this.service.submit(rows,'FOLDER'),tr('Se enviarán todos los borradores de esta quincena:')+' '+rows.length+' · '+money(rows)+'. '+tr('¿Continuar?')));
             button.disabled=!expired;button.title=tr('La carpeta se puede enviar al terminar la quincena. Cierre según fecha UTC del servidor.');
-            if(rows.length>250){button.disabled=true;details.append(node('p',tr('Máximo 250 gastos por envío. Puedes enviar gastos individualmente.'),'text-sm text-amber-800'));}
+            if(rows.length>250){button.disabled=true;content.append(node('p',tr('Máximo 250 gastos por envío. Puedes enviar gastos individualmente.'),'text-sm text-amber-800'));}
           }else{
             const phases={MANAGER:'En revisión del jefe',FINANCE:'Pendiente de pago',PAYMENT:'Pendiente de pago',CLOSED:'Revisión finalizada'};
-            details.append(node('p',tr(batch.mode==='INDIVIDUAL'?'Envío individual':'Carpeta enviada')+' · '+tr(phases[batch.phase]||batch.phase),'text-sm font-bold text-[#433364]'));
+            content.append(node('p',tr(batch.mode==='INDIVIDUAL'?'Envío individual':'Carpeta enviada')+' · '+tr(phases[batch.phase]||batch.phase),'text-sm font-bold text-[#433364]'));
             const pending=rows.filter(e=>e.status==='PENDING');
             const canReview=this.role==='manager'&&batch.phase==='MANAGER';
             if(canReview&&pending.length){
               const actions=node('div',undefined,'flex flex-wrap gap-2');
               this.button(actions,'Aprobar todos los pendientes',()=>this.run(()=>this.service.review(batch,null,'APPROVED'),tr('Se aprobarán todos los pendientes de esta carpeta:')+' '+pending.length+' · '+money(pending)+'. '+tr('Las decisiones anteriores se conservarán. ¿Continuar?')));
-              this.button(actions,'Rechazar todos los pendientes',()=>this.inputAction(details,'Motivo de rechazo para todos los pendientes',500,reason=>this.service.review(batch,null,'REJECTED',reason)),true);
-              details.append(actions);
+              this.button(actions,'Rechazar todos los pendientes',()=>this.inputAction(content,'Motivo de rechazo para todos los pendientes',500,reason=>this.service.review(batch,null,'REJECTED',reason)),true);
+              content.append(actions);
             }
             const payable=rows.filter(e=>e.status==='APPROVED'&&e.financeDecision!=='REJECTED');
             if(this.role==='finance'&&['FINANCE','PAYMENT'].includes(batch.phase)&&payable.length)
-              this.button(details,'Marcar carpeta como Pagada',()=>this.paymentAction(details,batch,null,payable),false,true);
-            if(this.role==='manager'&&batch.phase==='MANAGER')details.append(node('p',tr('Finanzas recibirá juntos los aprobados cuando no queden gastos pendientes de revisión.'),'text-xs text-slate-600'));
+              this.button(content,'Marcar carpeta como Pagada',()=>this.paymentAction(content,batch,null,payable),false,true);
+            if(this.role==='manager'&&batch.phase==='MANAGER')content.append(node('p',tr('Finanzas recibirá juntos los aprobados cuando no queden gastos pendientes de revisión.'),'text-xs text-slate-600'));
           }
-          for(const e of rows)this.expense(details,e,batch);section.append(details);
+          for(const e of rows)this.expense(content,e,batch);section.append(details);
         }
         this.root.append(section);
       }
