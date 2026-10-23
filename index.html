@@ -99,10 +99,10 @@
           <span id="badgeActiveEmployee" class="hidden ml-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-[#de4f5f]"></span>
         </button>
 
-        <!-- PESTAÑA 2: JEFE DIRECTO -->
+        <!-- PESTAÑA 2: MANAGER DIRECTO -->
         <button id="navTabManager" type="button" class="main-tab flex items-center gap-2 py-2.5 px-4 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-700 hover:text-slate-900 transition whitespace-nowrap" data-tab="manager">
           <i data-lucide="shield-check" class="w-4 h-4 text-[#433364]"></i>
-          <span>2. Aprobación Jefe</span>
+          <span>2. Aprobación Manager</span>
           <i data-lucide="lock" class="w-3 h-3 text-slate-400"></i>
           <span id="badgePendingManager" class="ml-1 px-2 py-0.5 rounded-full text-[11px] font-black bg-slate-200 text-slate-800">0</span>
         </button>
@@ -220,12 +220,12 @@
             <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-[#de4f5f]"></div>
           </div>
           <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
-            <span class="text-[#de4f5f] text-xs font-black uppercase tracking-wider block">Pendientes de mi Jefe</span>
+            <span class="text-[#de4f5f] text-xs font-black uppercase tracking-wider block">Pendientes de mi Manager</span>
             <span id="empStatPending" class="text-2xl font-black text-[#de4f5f] mt-1 block">0</span>
             <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-[#de4f5f]"></div>
           </div>
           <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
-            <span class="text-[#433364] text-xs font-black uppercase tracking-wider block">Aprobados por mi Jefe</span>
+            <span class="text-[#433364] text-xs font-black uppercase tracking-wider block">Aprobados por mi Manager</span>
             <span id="empStatApproved" class="text-2xl font-black text-[#433364] mt-1 block">0</span>
             <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-[#433364]"></div>
           </div>
@@ -523,17 +523,17 @@
     </section>
 
     <!-- ======================================================================= -->
-    <!-- VISTA 2: APROBACIÓN JEFE DIRECTO -->
+    <!-- VISTA 2: APROBACIÓN MANAGER DIRECTO -->
     <!-- ======================================================================= -->
     <section id="viewManager" class="tab-view space-y-6 hidden">
 
-      <!-- LOGIN JEFE -->
+      <!-- LOGIN MANAGER -->
       <div id="managerLoginBox" class="max-w-md mx-auto bg-white p-7 sm:p-9 rounded-3xl border border-slate-200 shadow-xl space-y-5 my-8">
         <div class="text-center space-y-2">
           <div class="w-14 h-14 mx-auto rounded-2xl bg-indigo-50 text-[#433364] flex items-center justify-center">
             <i data-lucide="shield-check" class="w-7 h-7"></i>
           </div>
-          <h3 class="text-xl font-black text-slate-900">Acceso Jefe Directo</h3>
+          <h3 class="text-xl font-black text-slate-900">Acceso Manager Directo</h3>
           <p class="text-xs text-slate-600">The Wonderfield Group • Supervisión y Aprobaciones</p>
         </div>
 
@@ -550,12 +550,12 @@
           <div id="mgrLoginError" class="hidden text-xs text-[#de4f5f] font-bold p-3 bg-rose-50 rounded-xl border border-rose-200"></div>
 
           <button type="submit" class="w-full py-3.5 px-4 won-btn-secondary font-black text-sm tracking-wide">
-            Iniciar Sesión como Jefe
+            Iniciar Sesión como Manager
           </button>
         </form>
       </div>
 
-      <!-- DASHBOARD JEFE -->
+      <!-- DASHBOARD MANAGER -->
       <div id="managerDashboard" class="space-y-6 hidden">
         <div class="won-header-gradient text-white p-5 rounded-3xl flex flex-wrap items-center justify-between gap-4 shadow-md">
           <div class="flex items-center gap-3.5">
@@ -749,7 +749,7 @@
               <button type="button" class="fin-tab active px-3.5 py-1 font-bold rounded-full bg-[#de4f5f] text-white" data-filter="all">Todos</button>
               <button type="button" class="fin-tab px-3.5 py-1 font-bold rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200" data-filter="APPROVED">⏳ Listos para Pagar (Aprobados)</button>
               <button type="button" class="fin-tab px-3.5 py-1 font-bold rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200" data-filter="PAID">💳 Ya Pagados</button>
-              <button type="button" class="fin-tab px-3.5 py-1 font-bold rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200" data-filter="PENDING">🟡 En Revisión Jefe</button>
+              <button type="button" class="fin-tab px-3.5 py-1 font-bold rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200" data-filter="PENDING">🟡 En Revisión Manager</button>
               <button type="button" class="fin-tab px-3.5 py-1 font-bold rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200" data-filter="REJECTED">🔴 Rechazados</button>
             </div>
             <span id="finFilteredCountText" class="text-slate-600 text-xs font-bold">0 registros</span>
@@ -828,7 +828,7 @@
         <div class="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
           <button type="button" id="admSubTabManagers" class="adm-subtab active px-4 py-2 text-xs sm:text-sm font-black rounded-full bg-[#433364] text-white flex items-center gap-2 shadow-sm" data-subtab="managers">
             <i data-lucide="users" class="w-4 h-4 text-[#f5cd33]"></i>
-            <span>1. Empleados & Jefes Directos</span>
+            <span>1. Empleados & Managers Directos</span>
           </button>
           
           <button type="button" id="admSubTabUsers" class="adm-subtab px-4 py-2 text-xs sm:text-sm font-bold rounded-full bg-white text-slate-700 hover:bg-slate-100 border border-slate-300 flex items-center gap-2 transition" data-subtab="users">
@@ -856,8 +856,8 @@
                   <tr>
                     <th class="px-4 py-3">Empleado</th>
                     <th class="px-4 py-3">Región / Marca</th>
-                    <th class="px-4 py-3">Jefe Directo Asignado</th>
-                    <th class="px-4 py-3">Correo del Jefe</th>
+                    <th class="px-4 py-3">Manager Directo Asignado</th>
+                    <th class="px-4 py-3">Correo del Manager</th>
                   </tr>
                 </thead>
                 <tbody id="areaManagersTableBody" class="divide-y divide-slate-200 bg-white font-medium">
@@ -950,7 +950,7 @@
     </div>
   </div>
 
-  <!-- 2. MODAL RECHAZO (JEFE) -->
+  <!-- 2. MODAL RECHAZO (MANAGER) -->
   <div id="rejectModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm hidden fade-in">
     <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200">
       <div class="flex items-center gap-3 text-[#de4f5f]">
@@ -1038,19 +1038,19 @@
 
         <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
           <span class="text-xs font-black text-[#433364] flex items-center gap-1.5">
-            <i data-lucide="mail" class="w-4 h-4 text-[#de4f5f]"></i> Datos del Jefe Directo para Alertas por Correo
+            <i data-lucide="mail" class="w-4 h-4 text-[#de4f5f]"></i> Datos del Manager Directo para Alertas por Correo
           </span>
 
           <div>
             <label for="amBossInput" class="block text-[11px] font-black text-slate-800 mb-1">
-              Nombre del Jefe Directo <span class="text-[#de4f5f]">*</span>
+              Nombre del Manager Directo <span class="text-[#de4f5f]">*</span>
             </label>
             <input type="text" id="amBossInput" required placeholder="Ej. Responsable directo" class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#433364] font-medium">
           </div>
 
           <div>
             <label for="amBossEmailInput" class="block text-[11px] font-black text-slate-800 mb-1">
-              Correo del Jefe Directo <span class="text-[#de4f5f]">*</span>
+              Correo del Manager Directo <span class="text-[#de4f5f]">*</span>
             </label>
             <input type="email" id="amBossEmailInput" required placeholder="roberto.gomez@wonderfieldgroup.com" class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#433364] font-medium">
           </div>
@@ -1121,20 +1121,21 @@
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none"></div>
 
   <!-- SCRIPTS -->
-    <script src="js/i18n.js?v=20261022-folder-cards"></script>
+    <script src="js/i18n.js?v=20261023-multi-role"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1"></script>
   <script src="js/services/supabase.js"></script>
   <script src="js/services/exchangeRates.js"></script>
-  <script src="js/services/auth.js?v=20260923-case-insensitive-login"></script>
-  <script src="js/services/db.js?v=20261022-fortnights"></script>
-  <script src="js/services/excelExport.js?v=20261012-employee-labels"></script>
-  <script src="js/expenseDashboard.js?v=20261020-analytics"></script>
+  <script src="js/services/auth.js?v=20261023-multi-role"></script>
+  <script src="js/services/db.js?v=20261023-multi-role"></script>
+  <script src="js/services/excelExport.js?v=20261023-multi-role"></script>
+  <script src="js/expenseDashboard.js?v=20261023-multi-role"></script>
   <script src="js/categoryLimits.js?v=20261020-category-limits"></script>
-    <script src="js/expenseFolders.js?v=20261022-folder-cards"></script>
-  <script src="js/app.js?v=20261022-admin-expense-trash"></script>
-  <script src="js/adminExpenses.js?v=20261022-admin-expense-trash"></script>
+    <script src="js/expenseFolders.js?v=20261023-multi-role"></script>
+  <script src="js/personalExpenses.js?v=20261023-multi-role"></script>
+  <script src="js/app.js?v=20261023-multi-role"></script>
+  <script src="js/adminExpenses.js?v=20261023-multi-role"></script>
   <script src="js/services/adminUsers.js?v=20260922-session-directory"></script>
-  <script src="js/adminPanel.js?v=20261012-employee-labels"></script>
+  <script src="js/adminPanel.js?v=20261023-multi-role"></script>
   <script src="js/unifiedLogin.js?v=20261012-password-controls"></script>
 </body>
 </html>
