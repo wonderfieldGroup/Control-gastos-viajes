@@ -17,7 +17,9 @@
 - Los gastos que existían antes de la migración conservan sus estados e historial y siguen su circuito individual anterior. No se reenvían ni se vuelven a pagar.
 - No se crean usuarios ni se cambian credenciales. No se activa el servicio de correos. Los nuevos borradores/carpetas no generan correos diarios; el correo de carpetas requerirá una adaptación separada antes de activarlo.
 
-## Despliegue coordinado (todavía no aplicado)
+## Despliegue coordinado
+
+Flujo quincenal activado en Supabase y publicado en main mediante PR #23 el 22 de octubre de 2026. Los siguientes pasos documentan el procedimiento de instalación, no deben repetirse sobre la base ya migrada. La retención de comprobantes se documenta por separado en `RECEIPT-RETENTION.md`.
 
 1. Revisar y ejecutar una sola vez la migración `supabase/migrations/20261023010659_fortnight_expense_submissions.sql` en el proyecto Wonderfield. Transacción: si falla, revertir antes de seguir. No aplicar esquemas iniciales ni todas las migraciones antiguas de nuevo.
 2. Comprobar tablas, RLS, funciones y la configuración de correo desactivada. No modificar registros reales para las pruebas.
