@@ -79,19 +79,26 @@
         if(this.snapshot)this.render(...this.snapshot);
       }
     }
-    button(parent,label,fn,danger=false){
-      const b=node('button',tr(label),'rounded-xl border px-3 py-2 text-xs font-bold '+(danger?'border-rose-300 text-rose-700':'border-slate-300 text-[#433364]'));
+    button(parent,label,fn,danger=false,success=false){
+      const b=node('button',tr(label),'rounded-xl border px-3 py-2 text-xs font-bold '+(danger?'border-rose-300 text-rose-700':success?'border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800':'border-slate-300 text-[#433364]'));
       b.type='button';b.addEventListener('click',fn);parent.append(b);return b;
     }
-    inputAction(parent,label,max,fn){
+    inputAction(parent,label,max,fn,options={}){
       if(this.editing||this.busy)return;this.editing=true;
       const f=node('form',undefined,'w-full rounded-xl border border-slate-300 bg-slate-50 p-3 space-y-3');
+      if(options.summary)f.append(node('p',options.summary,'text-sm font-bold text-slate-800'));
       const l=node('label',tr(label),'block text-sm font-bold');const input=node('textarea',undefined,'block w-full rounded-lg border p-2 text-slate-900');
       input.required=true;input.maxLength=max;input.rows=2;input.setAttribute('aria-label',tr(label));l.append(input);f.append(l);
-      const ok=this.button(f,'Confirmar',()=>{});ok.type='submit';
+      const ok=this.button(f,options.submitLabel||'Confirmar',()=>{},false,options.payment);ok.type='submit';
       this.button(f,'Cancelar',()=>{this.editing=false;this.fingerprint='';if(this.snapshot)this.render(...this.snapshot);});
       f.addEventListener('submit',event=>{event.preventDefault();if(input.value.trim())this.run(()=>fn(input.value.trim()));});
       parent.append(f);input.focus();
+    }
+    paymentAction(parent,batch,expense,rows){
+      this.inputAction(parent,'Referencia de pago',160,ref=>this.service.pay(batch,expense,ref),{
+        summary:tr('Se marcarán como pagados:')+' '+rows.length+' · '+money(rows)+'. '+tr('Se conservarán los gastos rechazados y los ya pagados.'),
+        submitLabel:'Marcar como Pagado',payment:true
+      });
     }
     receipt(parent,e){
       if(!e.receiptImage)return;
@@ -106,7 +113,7 @@
       const box=node('article',undefined,'rounded-2xl border border-slate-200 bg-white p-4 space-y-2');
       const reason=node('h4',e.reason,'font-bold text-slate-900');reason.setAttribute('data-no-i18n','');
       box.append(reason,node('p',`${e.date} · ${tr(e.category)} · ${money([e])}`,'text-sm text-slate-700'));
-      let label=e.isDraft?'Borrador privado':e.status==='PAID'?'Pagado':e.status==='REJECTED'?'Rechazado':e.financeDecision==='APPROVED'?'Validado por Finanzas':e.status==='APPROVED'?'Aprobado por el jefe':'Pendiente del jefe';
+      let label=e.isDraft?'Borrador privado':e.status==='PAID'?'Pagado':e.status==='REJECTED'?'Rechazado':e.status==='APPROVED'?'Aprobado (Por Pagar)':'Pendiente del jefe';
       box.append(node('p',tr(label),'text-xs font-bold text-[#433364]'));
       if(e.financeReason||e.rejectionReason){
         const rejection=node('p',undefined,'text-sm font-bold text-rose-700');
@@ -125,14 +132,13 @@
       }
       if(this.role==='employee'&&e.status==='REJECTED')this.button(actions,'Crear corrección',()=>this.hooks.correct(e.id));
       if(batch){
-        const canReview=(this.role==='manager'&&batch.phase==='MANAGER'&&e.status==='PENDING')
-          ||(this.role==='finance'&&batch.phase==='FINANCE'&&e.status==='APPROVED'&&!e.financeDecision);
+        const canReview=this.role==='manager'&&batch.phase==='MANAGER'&&e.status==='PENDING';
         if(canReview){
           this.button(actions,'Aprobar gasto',()=>this.run(()=>this.service.review(batch,e,'APPROVED'),tr('¿Aprobar este gasto?')));
           this.button(actions,'Rechazar gasto',()=>this.inputAction(box,'Motivo de rechazo',500,reason=>this.service.review(batch,e,'REJECTED',reason)),true);
         }
-        if(this.role==='finance'&&batch.phase==='PAYMENT'&&e.status==='APPROVED'&&e.financeDecision==='APPROVED')
-          this.button(actions,'Registrar pago del gasto',()=>this.inputAction(box,'Referencia de pago',160,ref=>this.service.pay(batch,e,ref)));
+        if(this.role==='finance'&&['FINANCE','PAYMENT'].includes(batch.phase)&&e.status==='APPROVED'&&e.financeDecision!=='REJECTED')
+          this.button(actions,'Marcar como Pagado',()=>this.paymentAction(box,batch,e,[e]),false,true);
       }
       box.append(actions);parent.append(box);
     }
@@ -186,17 +192,19 @@
             button.disabled=!expired;button.title=tr('La carpeta se puede enviar al terminar la quincena. Cierre según fecha UTC del servidor.');
             if(rows.length>250){button.disabled=true;details.append(node('p',tr('Máximo 250 gastos por envío. Puedes enviar gastos individualmente.'),'text-sm text-amber-800'));}
           }else{
-            const phases={MANAGER:'En revisión del jefe',FINANCE:'En revisión de Finanzas',PAYMENT:'Pendiente de pago',CLOSED:'Revisión finalizada'};
+            const phases={MANAGER:'En revisión del jefe',FINANCE:'Pendiente de pago',PAYMENT:'Pendiente de pago',CLOSED:'Revisión finalizada'};
             details.append(node('p',tr(batch.mode==='INDIVIDUAL'?'Envío individual':'Carpeta enviada')+' · '+tr(phases[batch.phase]||batch.phase),'text-sm font-bold text-[#433364]'));
-            const pending=rows.filter(e=>this.role==='manager'?e.status==='PENDING':e.status==='APPROVED'&&!e.financeDecision);
-            const canReview=(this.role==='manager'&&batch.phase==='MANAGER')||(this.role==='finance'&&batch.phase==='FINANCE');
+            const pending=rows.filter(e=>e.status==='PENDING');
+            const canReview=this.role==='manager'&&batch.phase==='MANAGER';
             if(canReview&&pending.length){
               const actions=node('div',undefined,'flex flex-wrap gap-2');
               this.button(actions,'Aprobar todos los pendientes',()=>this.run(()=>this.service.review(batch,null,'APPROVED'),tr('Se aprobarán todos los pendientes de esta carpeta:')+' '+pending.length+' · '+money(pending)+'. '+tr('Las decisiones anteriores se conservarán. ¿Continuar?')));
               this.button(actions,'Rechazar todos los pendientes',()=>this.inputAction(details,'Motivo de rechazo para todos los pendientes',500,reason=>this.service.review(batch,null,'REJECTED',reason)),true);
               details.append(actions);
             }
-            if(this.role==='finance'&&batch.phase==='PAYMENT')this.button(details,'Registrar pago de todos los aprobados',()=>this.inputAction(details,'Referencia de pago',160,ref=>this.service.pay(batch,null,ref)));
+            const payable=rows.filter(e=>e.status==='APPROVED'&&e.financeDecision!=='REJECTED');
+            if(this.role==='finance'&&['FINANCE','PAYMENT'].includes(batch.phase)&&payable.length)
+              this.button(details,'Marcar carpeta como Pagada',()=>this.paymentAction(details,batch,null,payable),false,true);
             if(this.role==='manager'&&batch.phase==='MANAGER')details.append(node('p',tr('Finanzas recibirá juntos los aprobados cuando no queden gastos pendientes de revisión.'),'text-xs text-slate-600'));
           }
           for(const e of rows)this.expense(details,e,batch);section.append(details);

@@ -22,6 +22,9 @@
   for (const [es, en, it] of receiptMessages) translations.set(es, { en, it });
   translations.set('🚗 Kilometraje', { en: '🚗 Mileage', it: '🚗 Chilometraggio' });
   translations.set('Kilometraje', { en: 'Mileage', it: 'Chilometraggio' });
+  translations.set('Marcar carpeta como Pagada', { en: 'Mark folder as Paid', it: 'Segna la cartella come pagata' });
+  translations.set('Se marcarán como pagados:', { en: 'Will be marked as paid:', it: 'Saranno segnate come pagate:' });
+  translations.set('Se conservarán los gastos rechazados y los ya pagados.', { en: 'Rejected and already-paid expenses will remain unchanged.', it: 'Le spese respinte e già pagate rimarranno invariate.' });
   translations.set('Verificando acceso...', { en: 'Verifying access...', it: 'Verifica dell’accesso...' });
   translations.set('Mostrar', { en: 'Show', it: 'Mostra' });
   translations.set('Ocultar', { en: 'Hide', it: 'Nascondi' });
