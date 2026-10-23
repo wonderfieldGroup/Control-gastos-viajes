@@ -10,14 +10,17 @@
 - Cada envío agrupa solo gastos del mismo empleado y quincena. Hasta 250 por envío. Clave de idempotencia y bloqueo para impedir envíos duplicados.
 - Cualquiera de los dos jefes asignados puede decidir. Se revisa un gasto o todos los pendientes; nunca se revierten decisiones previas en una acción masiva.
 - Finanzas recibe juntos los aprobados solo cuando no queda ningún gasto pendiente del jefe. Los rechazados por el jefe permanecen visibles para empleado y jefes.
-- Finanzas valida/rechaza individualmente o todos los pendientes. Sus rechazos vuelven al empleado con motivo y permiten crear un nuevo borrador de corrección, conservando el original y enlazándolo.
-- Validar en Finanzas NO marca como pagado. El registro de pago, individual o conjunto, exige una referencia y que termine la validación de Finanzas. No se ejecutan transferencias bancarias.
+- Finanzas dispone únicamente de «Marcar como Pagado» por gasto o «Marcar carpeta como Pagada» para todos los aprobados que falten por pagar. No hay botones de segunda aprobación o rechazo en esa vista.
+- El registro de pago, individual o conjunto, exige una referencia. Registra la conformidad de Finanzas y el pago de forma atómica, con identidad y fecha, sin alterar la aprobación del jefe. No se ejecutan transferencias bancarias.
+- Los pagos conjuntos excluyen rechazados y ya pagados, conservando sus decisiones y referencias previas. Los envíos existentes en fase FINANCE o PAYMENT son compatibles, sin modificar automáticamente sus datos.
 - Todos los perfiles de Finanzas ven el mismo estado. Revisión optimista de la carpeta y bloqueo transaccional para evitar sobrescrituras y pagos registrados dos veces.
 - Las ediciones y borrados del empleado se limitan a borradores. No se cambian comprobantes de gastos enviados.
 - Los gastos que existían antes de la migración conservan sus estados e historial y siguen su circuito individual anterior. No se reenvían ni se vuelven a pagar.
 - No se crean usuarios ni se cambian credenciales. No se activa el servicio de correos. Los nuevos borradores/carpetas no generan correos diarios; el correo de carpetas requerirá una adaptación separada antes de activarlo.
 
-## Despliegue coordinado (todavía no aplicado)
+## Despliegue coordinado
+
+El flujo quincenal base ya se publicó mediante PR #23. Para el ajuste de Finanzas, aplicar únicamente la nueva migración `20261023020158_finance_direct_folder_payment.sql` y publicar `index.html`, `js/i18n.js` y `js/expenseFolders.js`. No aplicar la migración de retención del PR #24, no crear tareas de limpieza y no cambiar claves ni cuentas.
 
 1. Revisar y ejecutar una sola vez la migración `supabase/migrations/20261023010659_fortnight_expense_submissions.sql` en el proyecto Wonderfield. Transacción: si falla, revertir antes de seguir. No aplicar esquemas iniciales ni todas las migraciones antiguas de nuevo.
 2. Comprobar tablas, RLS, funciones y la configuración de correo desactivada. No modificar registros reales para las pruebas.
