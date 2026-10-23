@@ -56,13 +56,30 @@ test('Full manager keeps legacy actions, adds folder actions and preserves over-
  d.getElementById('mgrTabAnalytics').click();assert.equal(d.getElementById('mgrAnalyticsPanel').classList.contains('hidden'),false);
  assert.deepEqual(f.errors,[]);await f.close();
 });
-test('Full finance shows review rather than premature payment and keeps limits and analytics',async()=>{
+test('Full finance shows only direct payment actions and keeps limits and analytics',async()=>{
  const f=await fixture('finance'),d=f.w.document;
- assert.match(d.getElementById('financeExpenseFolders').textContent,/Aprobar todos los pendientes/);
- assert.doesNotMatch(d.getElementById('financeExpenseFolders').textContent,/Registrar pago/);
+ const root=d.getElementById('financeExpenseFolders');
+ assert.match(root.textContent,/Marcar carpeta como Pagada/);assert.match(root.textContent,/Marcar como Pagado/);
+ assert.doesNotMatch(root.textContent,/Aprobar gasto|Rechazar gasto|Aprobar todos|Rechazar todos/);
+ const folderButton=[...root.querySelectorAll('button')].find(b=>b.textContent==='Marcar carpeta como Pagada');folderButton.click();
+ assert.equal(root.querySelector('textarea').required,true);assert.match(root.querySelector('form').textContent,/1 · 520,00/);
+ assert.match(root.querySelector('form').textContent,/Se conservarán/);
  d.getElementById('finViewLimits').click();assert.equal(d.querySelectorAll('#financeCategoryLimits form').length,7);
  d.getElementById('finViewAnalytics').click();assert.equal(d.getElementById('financeAnalyticsPanel').classList.contains('hidden'),false);
  assert.deepEqual(f.errors,[]);await f.close();
+});
+
+test('Finance direct pay labels translate and paid or rejected rows never have payment buttons',async()=>{
+ const f=await fixture('finance'),w=f.w,d=w.document;const before=d.createElement('div');d.body.append(before);
+ const ui=new w.ExpenseFolders(before,'finance',{refresh:async()=>{}});
+ const row={id:'row',batchId:'batch',employeeId:'employee',employee:'QA',reason:'QA',date:'2024-09-12',category:'Comidas y Dietas',amountEUR:520,status:'APPROVED'};
+ ui.render([row],[row]);assert.equal([...ui.root.querySelectorAll('button')].filter(b=>b.textContent==='Marcar como Pagado').length,1);
+ w.portalI18n.setLanguage('en');ui.render([row],[row]);assert.match(ui.root.textContent,/Mark folder as Paid/);
+ w.portalI18n.setLanguage('it');ui.render([row],[row]);assert.match(ui.root.textContent,/Segna la cartella come pagata/);
+ row.status='PAID';ui.render([row],[row]);assert.equal(ui.root.querySelectorAll('button').length,0);
+ row.status='REJECTED';ui.render([row],[row]);assert.equal(ui.root.querySelectorAll('button').length,0);
+ row.status='APPROVED';f.batches[0].phase='PAYMENT';ui.render([row],[row]);assert.ok(ui.root.querySelector('button'));
+ ui.clear();assert.deepEqual(f.errors,[]);await f.close();
 });
 test('Calendar utility rejects invalid dates; folders translate; unavailable workflow fails closed',async()=>{
  const f=await fixture(),w=f.w,d=w.document;

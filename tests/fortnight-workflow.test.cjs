@@ -121,6 +121,8 @@ test('Fortnight workflow: real PostgreSQL, RLS, atomic batches and preserved leg
   await as(4,async()=>{await assert.rejects(db.query('update public.expense_batches set phase=\'PAYMENT\''),e=>e.code==='42501');});
  });
  await t.test('Actual folder UI completes employee → manager → finance → recorded payment against isolated PostgreSQL',async()=>{
+  const directPayMigration=fs.readdirSync(path.join(root,'supabase/migrations')).find(s=>s.endsWith('_finance_direct_folder_payment.sql'));
+  await db.exec(read('supabase/migrations/'+directPayMigration));
   const {JSDOM}=require(process.env.JSDOM_MODULE||'jsdom');
   const dom=new JSDOM('<!doctype html><html><head><title>QA</title></head><body><div id="before"></div></body></html>',{url:'https://qa.example.invalid',runScripts:'outside-only'});
   const w=dom.window;w.confirm=()=>true;w.crypto.randomUUID=()=>crypto.randomUUID();
@@ -159,10 +161,10 @@ test('Fortnight workflow: real PostgreSQL, RLS, atomic batches and preserved leg
   actor=2;mount();await refresh();d=w.document.querySelector(`details[data-key="${batch}"]`);assert.ok(d);assert.equal(d.querySelectorAll('article').length,2);
   await click(d,'Aprobar todos los pendientes');
   actor=4;mount();await refresh();d=w.document.querySelector(`details[data-key="${batch}"]`);assert.ok(d);
-  assert.ok(!d.textContent.includes('Registrar pago de todos los aprobados'));
-  await click(d,'Aprobar todos los pendientes');
+  assert.ok(!d.textContent.includes('Aprobar todos los pendientes'));
+  assert.ok(!d.textContent.includes('Rechazar todos los pendientes'));
   assert.equal((await db.query('select count(*)::int as n from public.expenses where batch_id=$1 and status=\'PAID\'',[batch])).rows[0].n,0);
-  d=w.document.querySelector(`details[data-key="${batch}"]`);await click(d,'Registrar pago de todos los aprobados');
+  d=w.document.querySelector(`details[data-key="${batch}"]`);await click(d,'Marcar carpeta como Pagada');
   const form=d.querySelector('form');form.querySelector('textarea').value='QA-ISOLATED-NOT-A-REAL-PAYMENT';form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
   for(let i=0;i<100&&ui.busy;i++)await new Promise(resolve=>setTimeout(resolve,5));assert.equal(ui.error,'');
   assert.equal((await db.query('select count(*)::int as n from public.expenses where batch_id=$1 and status=\'PAID\'',[batch])).rows[0].n,2);
@@ -172,6 +174,50 @@ test('Fortnight workflow: real PostgreSQL, RLS, atomic batches and preserved leg
   d.open=true;ui.fingerprint='';ui.render(rows,rows);assert.equal(w.document.querySelector('details[data-key="draft:2024-09-01"]').open,true);
   w.authService.getCurrentProfile=()=>null;ui.render(rows,rows);assert.equal(ui.root.textContent,'');
   observers.forEach(o=>o.disconnect());await new Promise(resolve=>setTimeout(resolve,25));observers.forEach(o=>o.disconnect());dom.window.close();
+ });
+ await t.test('Direct individual payment is visible to both Finance profiles and preserves rejected and remaining expenses',async()=>{
+  for(const n of [40,41,42])await as(1,()=>insert(n));await as(1,()=>submit([40,41,42],140));
+  await as(2,()=>review(140,42,'REJECTED',0,'Not eligible'));await as(3,()=>review(140,null,'APPROVED',1));
+  const ref='QA-INDIVIDUAL-NOT-A-TRANSFER';
+  await as(4,()=>db.query('select * from public.pay_expense_batch($1,$2,$3,$4)',[id(140),id(40),ref,2]));
+  for(const actor of [4,5])await as(actor,async()=>{
+   const rows=(await db.query('select id,status,payment_ref,finance_decision from public.expenses where batch_id=$1 order by id',[id(140)])).rows;
+   assert.equal(rows.length,2);assert.equal(rows[0].status,'PAID');assert.equal(rows[0].payment_ref,ref);
+   assert.equal(rows[1].status,'APPROVED');assert.equal(rows[1].finance_decision,null);
+  });
+  assert.equal((await db.query('select status from public.expenses where id=$1',[id(42)])).rows[0].status,'REJECTED');
+  const e=(await db.query('select * from public.expenses where id=$1',[id(40)])).rows[0];assert.equal(e.finance_decided_by,id(4));assert.equal(e.paid_by,id(4));
+  assert.ok(e.finance_decided_at);assert.ok(e.paid_at);assert.equal(e.approved_by,id(3));
+ });
+ await t.test('Bulk payment completes only unpaid approved expenses without changing the earlier reference',async()=>{
+  await as(5,()=>db.query('select * from public.pay_expense_batch($1,null,$2,3)',[id(140),'QA-FOLDER-NOT-A-TRANSFER']));
+  const rows=(await db.query('select id,status,payment_ref from public.expenses where batch_id=$1 order by id',[id(140)])).rows;
+  assert.deepEqual(rows.map(e=>e.status),['PAID','PAID','REJECTED']);
+  assert.equal(rows[0].payment_ref,'QA-INDIVIDUAL-NOT-A-TRANSFER');assert.equal(rows[1].payment_ref,'QA-FOLDER-NOT-A-TRANSFER');assert.equal(rows[2].payment_ref,null);
+  assert.equal((await db.query('select phase from public.expense_batches where id=$1',[id(140)])).rows[0].phase,'CLOSED');
+  for(const item of [40,41]){
+   const events=(await db.query("select event_type from public.expense_events where expense_id=$1 and event_type in ('PAID','FINANCE_APPROVED')",[id(item)])).rows;
+   assert.equal(events.filter(e=>e.event_type==='PAID').length,1);assert.equal(events.filter(e=>e.event_type==='FINANCE_APPROVED').length,1);
+  }
+ });
+ await t.test('Direct payment rejects wrong roles, stale revisions, unreviewed folders, empty references and duplicate payments',async()=>{
+  for(const actor of [0,1,2,6,7,8,9])await as(actor,()=>assert.rejects(pay(140,null,4),e=>e.code==='42501'));
+  await as(4,async()=>{
+   await assert.rejects(pay(140,null,3),e=>e.code==='40001');await assert.rejects(pay(140,null,4),e=>e.code==='40001');
+   await assert.rejects(pay(106,null,0),e=>e.code==='40001');
+   await assert.rejects(db.query('select * from public.pay_expense_batch($1,null,$2,0)',[id(106),'   ']),e=>e.code==='22023');
+  });
+  for(const item of [40,41])assert.equal((await db.query("select count(*)::int n from public.expense_events where expense_id=$1 and event_type='PAID'",[id(item)])).rows[0].n,1);
+ });
+ await t.test('Direct pay preserves earlier Finance sign-off and supports old PAYMENT phase without activating retention',async()=>{
+  await as(1,()=>insert(43));await as(1,()=>submit([43],143,'INDIVIDUAL'));await as(2,()=>review(143,null,'APPROVED',0));
+  await as(4,()=>review(143,null,'APPROVED',1));
+  const before=(await db.query('select finance_decided_at,finance_decided_by from public.expenses where id=$1',[id(43)])).rows[0];
+  await as(5,()=>pay(143,null,2));
+  const after=(await db.query('select finance_decided_at,finance_decided_by from public.expenses where id=$1',[id(43)])).rows[0];assert.deepEqual(after,before);
+  assert.equal((await db.query("select count(*)::int n from public.expense_events where expense_id=$1 and event_type='FINANCE_APPROVED'",[id(43)])).rows[0].n,1);
+  assert.equal((await db.query("select to_regprocedure('private.receipt_retention_tick(boolean)')::text r")).rows[0].r,null);
+  assert.equal((await db.query("select has_function_privilege('anon','public.pay_expense_batch(uuid,uuid,text,bigint)','execute') b")).rows[0].b,false);
  });
  await db.close();
 });
