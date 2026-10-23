@@ -11,7 +11,7 @@ class DatabaseService {
   async markAsPaid(id, _financeName, paymentRef = '') { const { data, error } = await this.client.rpc('mark_expense_paid', { expense_id: id, reference: paymentRef }); if (error) throw error; return this.toAppExpense(data); }
   async delete(id) { const expense = await this.getById(id); if (!expense.isDraft) throw new Error('Solo se pueden eliminar borradores.'); if (expense.receiptPath) { const { error: storageError } = await this.client.storage.from('receipts').remove([expense.receiptPath]); if (storageError) throw storageError; } const { error } = await this.client.from('expenses').delete().eq('id', id).eq('is_draft',true); if (error) throw error; return true; }
   async clear() { throw new Error('La limpieza global no está disponible en producción.'); }
-  async currentUser() { const profile = window.authService?.getCurrentProfile(); if (!profile || profile.status !== 'ACTIVE') throw new Error('Tu sesión no está autorizada para registrar gastos.'); return profile; }
+  async currentUser() { const profile = window.authService?.getCurrentProfile(); if (!profile || !window.authService.canReportExpenses()) throw new Error('Tu sesión no está autorizada para registrar gastos.'); return profile; }
   async uploadReceipt(dataUrl, expenseId, userId, upsert = false) {
     if (!dataUrl) return null;
     const blob = await this.validateReceipt(dataUrl);

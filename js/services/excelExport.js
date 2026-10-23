@@ -77,7 +77,7 @@ class ExcelExportService {
       if (isApproved) totalApprovedUnpaidEUR += amountEUR;
 
       let statusLabel = 'PENDIENTE DE APROBACIÓN';
-      if (item.status === 'APPROVED') statusLabel = 'APROBADO POR JEFE';
+      if (item.status === 'APPROVED') statusLabel = 'APROBADO POR MANAGER';
       if (item.status === 'REJECTED') statusLabel = 'RECHAZADO';
       if (item.status === 'PAID') statusLabel = 'PAGADO / LIQUIDADO';
 

@@ -31,14 +31,14 @@ class AuthService {
         return {
           id: row.id, username: row.username || row.email, name: row.full_name, full_name: row.full_name,
           email: row.email, role: row.role, status: row.active ? 'ACTIVE' : 'INACTIVE',
-          mustChangePassword: Boolean(row.must_change_password),
+          mustChangePassword: Boolean(row.must_change_password), expenseReportingEnabled: row.expense_reporting_enabled === true,
           region: row.region || 'General', directBoss: [boss?.full_name, secondBoss?.full_name].filter(Boolean).join(' y '), bossEmail: [boss?.email, secondBoss?.email].filter(Boolean).join(' / '),
           directBossId: row.direct_boss_id, secondaryBossId: row.secondary_boss_id, notes: row.notes || ''
         };
       });
       this.profile = this.directory.find(profile => profile.id === this.profile.id) || this.profile;
     }
-    if (this.profile?.role === 'employee' && (this.profile.directBossId || this.profile.secondaryBossId)) {
+    if (this.canReportExpenses() && (this.profile.directBossId || this.profile.secondaryBossId)) {
       const { data: managerData, error: managerError } = await this.client.functions.invoke('admin-user-management', { body: { action: 'get_my_managers' } });
       if (!managerError && Array.isArray(managerData?.managers)) {
         this.profile.directBoss = managerData.managers.map(manager => manager.full_name).join(' y ');
@@ -72,13 +72,17 @@ class AuthService {
     return { success: true, user: profile, employee: profile };
   }
   async logout() { await this.client.auth.signOut(); this.profile = null; this.directory = []; }
-  isEmployeeAuthenticated() { return this.profile?.role === 'employee'; }
+  canReportExpenses(profile = this.profile) {
+    return Boolean(profile?.status === 'ACTIVE' && (profile.role === 'employee' ||
+      (['manager', 'finance'].includes(profile.role) && profile.expenseReportingEnabled === true)));
+  }
+  isEmployeeAuthenticated() { return this.canReportExpenses(); }
   isAuthenticated(role) { return Boolean(this.profile && (this.profile.role === role || this.profile.role === 'admin')); }
   getCurrentEmployee() { return this.isEmployeeAuthenticated() ? this.profile : null; }
   getCurrentProfile() { return this.profile; }
   getUser(role) { return this.isAuthenticated(role) ? this.profile : null; }
   getUsers() { return this.directory; }
-  getAreaManagers() { return this.directory.filter(profile => profile.role === 'employee'); }
+  getAreaManagers() { return this.directory.filter(profile => this.canReportExpenses(profile)); }
   getBossForEmployee(emailOrName) { return this.getAreaManagers().find(item => item.email === emailOrName || item.name === emailOrName) || null; }
   async saveUser() { throw new Error('Las cuentas se aprovisionan mediante Supabase Auth.'); }
   async deleteUser() { throw new Error('Las cuentas se administran mediante Supabase Auth.'); }
@@ -95,7 +99,7 @@ class AuthService {
     const boss = this.directory.find(profile => profile.id === row.direct_boss_id);
     const secondBoss = this.directory.find(profile => profile.id === row.secondary_boss_id);
     return { id: row.id, username: row.username || row.email, name: row.full_name, full_name: row.full_name, email: row.email,
-      role: row.role, status: row.active ? 'ACTIVE' : 'INACTIVE', mustChangePassword: Boolean(row.must_change_password),
+      role: row.role, status: row.active ? 'ACTIVE' : 'INACTIVE', mustChangePassword: Boolean(row.must_change_password), expenseReportingEnabled: row.expense_reporting_enabled === true,
       region: row.region || 'General', directBoss: [boss?.name, secondBoss?.name].filter(Boolean).join(' y '),
       bossEmail: [boss?.email, secondBoss?.email].filter(Boolean).join(' / '), directBossId: row.direct_boss_id, secondaryBossId: row.secondary_boss_id, notes: row.notes || '' };
   }
