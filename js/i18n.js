@@ -474,6 +474,33 @@
   ];
   for (const [es,en,it] of folderMessages) translations.set(es,{en,it});
   for (const [es,en,it] of [["Reportar mis gastos","Report my expenses","Segnala le mie spese"],["Volver a Finanzas","Back to Finance","Torna a Finanza"],["Volver a mi panel Manager","Back to my Manager dashboard","Torna al pannello Manager"],["Permitir reportar sus propios gastos","Allow reporting personal expenses","Consenti la segnalazione delle proprie spese"],["Asigna un Manager o director aprobador distinto del solicitante. Los directores deben tener un perfil Manager.","Assign a Manager or director other than the requester as approver. Directors must use a Manager profile.","Assegna un Manager o direttore diverso dal richiedente come approvatore. I direttori devono avere un profilo Manager."],["Selecciona un Manager aprobador","Select an approving Manager","Seleziona un Manager approvatore"],["Reporta gastos","Reports expenses","Segnala spese"],["No habilitado","Not enabled","Non abilitato"],["Habilitado","Enabled","Abilitato"],["No puedes aprobar, rechazar ni marcar como pagados tus propios gastos.","You cannot approve, reject or mark your own expenses as paid.","Non puoi approvare, rifiutare o segnare come pagate le tue spese."]]) translations.set(es,{en,it});
+  for (const [es,en,it] of [
+    ['Categorías de gastos','Expense categories','Categorie di spesa'],
+    ['Cargando categorías...','Loading categories...','Caricamento categorie...'],
+    ['Añade o retira las categorías disponibles para todos los empleados. Los gastos anteriores y los límites de Finanzas se conservan.','Add or remove the categories available to all employees. Existing expenses and Finance limits are preserved.','Aggiungi o rimuovi le categorie disponibili per tutti i dipendenti. Le spese precedenti e i limiti di Finanza vengono conservati.'],
+    ['Actualizar categorías','Refresh categories','Aggiorna categorie'],
+    ['Categorías actualizadas.','Categories refreshed.','Categorie aggiornate.'],
+    ['Nombre de la nueva categoría','New category name','Nome della nuova categoria'],
+    ['Añadir categoría','Add category','Aggiungi categoria'],
+    ['Quitar','Remove','Rimuovi'],['Restaurar','Restore','Ripristina'],['Retirada','Removed','Rimossa'],
+    ['Disponible para nuevos gastos','Available for new expenses','Disponibile per nuove spese'],
+    ['Selecciona una categoría','Select a category','Seleziona una categoria'],
+    ['No hay categorías disponibles. Contacta con Admin.','No categories are available. Contact Admin.','Nessuna categoria disponibile. Contatta Admin.'],
+    ['No se pudieron cargar las categorías. Actualiza la página.','Could not load categories. Refresh the page.','Impossibile caricare le categorie. Ricarica la pagina.'],
+    ['No se pueden cargar las categorías. Comprueba la conexión y vuelve a actualizar.','Cannot load categories. Check your connection and refresh again.','Impossibile caricare le categorie. Controlla la connessione e aggiorna di nuovo.'],
+    ['Solo un administrador activo puede gestionar categorías.','Only an active administrator can manage categories.','Solo un amministratore attivo può gestire le categorie.'],
+    ['Escribe un nombre de categoría de entre 1 y 80 caracteres.','Enter a category name between 1 and 80 characters.','Inserisci un nome di categoria da 1 a 80 caratteri.'],
+    ['Esta categoría ya existe. Si está retirada, pulsa Restaurar.','This category already exists. If removed, select Restore.','Questa categoria esiste già. Se è rimossa, seleziona Ripristina.'],
+    ['Otro administrador cambió esta categoría. Actualiza las categorías y vuelve a intentarlo.','Another administrator changed this category. Refresh categories and try again.','Un altro amministratore ha modificato questa categoria. Aggiorna le categorie e riprova.'],
+    ['No se pudo guardar la categoría. Comprueba la conexión y vuelve a intentarlo.','Could not save the category. Check your connection and try again.','Impossibile salvare la categoria. Controlla la connessione e riprova.'],
+    ['No se pudo confirmar el cambio. Actualiza las categorías.','Could not confirm the change. Refresh categories.','Impossibile confermare la modifica. Aggiorna le categorie.'],
+    ['¿Retirar esta categoría de los nuevos gastos? Se conservarán los gastos anteriores y sus límites.','Remove this category from new expenses? Existing expenses and their limits will be preserved.','Rimuovere questa categoria dalle nuove spese? Le spese precedenti e i relativi limiti saranno conservati.'],
+    ['Categoría añadida.','Category added.','Categoria aggiunta.'],
+    ['Categoría retirada. Los gastos anteriores se conservan.','Category removed. Existing expenses are preserved.','Categoria rimossa. Le spese precedenti vengono conservate.'],
+    ['Categoría restaurada.','Category restored.','Categoria ripristinata.'],
+    ['Selecciona una categoría disponible. Si no aparece ninguna, contacta con Admin.','Select an available category. If none appear, contact Admin.','Seleziona una categoria disponibile. Se non ne appare nessuna, contatta Admin.'],
+    ['Esta categoría ya no está disponible para nuevos gastos. Selecciona otra categoría y vuelve a guardar.','This category is no longer available for new expenses. Select another category and save again.','Questa categoria non è più disponibile per nuove spese. Seleziona un’altra categoria e salva di nuovo.']
+  ]) translations.set(es,{en,it});
   const fragments = [...translations].sort((a, b) => b[0].length - a[0].length);
   const supported = new Set(['es', 'en', 'it']);
   const storageKey = 'wonderfield.portal.language';
