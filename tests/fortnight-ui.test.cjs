@@ -73,6 +73,7 @@ async function fixture(role='employee',reporting=false){
  w.supabaseClient={from:table=>({
   select:()=>table==='expenses'?{order:async()=>({data:accessible()}),eq:(_key,value)=>({single:async()=>({data:rows.find(e=>e.id===value)})})}:
    table==='expense_batches'?{order:async()=>offline?{error:{code:'PGRST205'}}:{data:batches}}:
+   table==='expense_categories'?{data:['Alojamiento','Transporte y Vuelos','Comidas y Dietas','Taxi y Movilidad','Kilometraje','Clientes y Comercial','Otros'].map((category,i)=>({category,active:true,sort_order:i,revision:0}))}:
    {data:['Alojamiento','Transporte y Vuelos','Comidas y Dietas','Taxi y Movilidad','Kilometraje','Clientes y Comercial','Otros'].map(category=>({category,limit_eur:category==='Comidas y Dietas'?500:null,revision:0}))},
   insert:row=>({select:()=>({single:async()=>{const saved={...row,created_at:new Date().toISOString()};rows.push(saved);return{data:saved};}})})
  }),rpc:async(name,args)=>{
@@ -90,7 +91,7 @@ async function fixture(role='employee',reporting=false){
  w.lucide={createIcons(){}};w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};
  w.exchangeRateService={init:async()=>{},rates:{},getCurrencyInfo:()=>({flag:'',name:'Euro'}),getRateToEUR:()=>1,convertToEUR:amount=>({amountEUR:amount,formattedEUR:String(amount)})};
  w.SUPABASE_CONFIG={url:'https://example.supabase.co'};
- for(const f of ['js/i18n.js','js/services/db.js','js/categoryLimits.js','js/expenseDashboard.js','js/expenseFolders.js','js/adminExpenses.js','js/personalExpenses.js','js/app.js'])w.eval(source(f));
+ for(const f of ['js/i18n.js','js/services/db.js','js/categoryCatalog.js','js/categoryLimits.js','js/expenseDashboard.js','js/expenseFolders.js','js/adminExpenses.js','js/personalExpenses.js','js/app.js'])w.eval(source(f));
  w.document.dispatchEvent(new w.Event('DOMContentLoaded'));await tick();
  w.document.getElementById(role==='employee'?'empLoginForm':role==='manager'?'managerLoginForm':role==='admin'?'adminLoginForm':'financeLoginForm').dispatchEvent(new w.Event('submit',{cancelable:true}));
  await tick();

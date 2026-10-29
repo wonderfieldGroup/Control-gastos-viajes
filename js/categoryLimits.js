@@ -1,17 +1,12 @@
 /* Shared, advisory-only category limits. Database RLS is the authorization boundary. */
 (() => {
   'use strict';
-  const categories = [
-    ['Alojamiento', 'Alojamiento / Hotel'], ['Transporte y Vuelos', 'Transporte y Vuelos'],
-    ['Comidas y Dietas', 'Comidas y Dietas'], ['Taxi y Movilidad', 'Taxi y Movilidad'],
-    ['Kilometraje', 'Kilometraje'], ['Clientes y Comercial', 'Clientes y Comercial'], ['Otros', 'Otros Gastos']
-  ];
+  const categories = () => window.categoryCatalog?.entries() || [];
   const tr = text => window.portalI18n?.t(text) || text;
   const money = amount => new Intl.NumberFormat(window.portalI18n?.locale?.() || 'es-ES', { style: 'currency', currency: 'EUR' }).format(amount);
   const escape = text => String(text).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
   const editor = profile => profile?.status === 'ACTIVE' && ['finance', 'admin'].includes(profile.role);
   const reader = profile => profile?.status === 'ACTIVE' && ['manager', 'finance', 'admin'].includes(profile.role);
-  const names = new Set(categories.map(([key]) => key));
   const el = (tag, text, className = '', attributes = {}) => {
     const node = document.createElement(tag); node.className = className;
     if (text !== undefined) node.textContent = text;
@@ -25,7 +20,7 @@
     return Math.round(Number(input.replace(',', '.')) * 100) / 100;
   }
   function validRow(row) {
-    return row && names.has(row.category) && Number.isSafeInteger(Number(row.revision)) && Number(row.revision) >= 0
+    return row && typeof row.category === 'string' && row.category.length > 0 && row.category.length <= 80 && Number.isSafeInteger(Number(row.revision)) && Number(row.revision) >= 0
       && (row.limit_eur === null || row.limit_eur !== '' && Number.isFinite(Number(row.limit_eur)) && Number(row.limit_eur) >= 0 && Number(row.limit_eur) <= 9999999999.99);
   }
   class CategoryLimitService {
@@ -41,7 +36,8 @@
         const { data, error } = await window.supabaseClient.from('expense_category_limits').select('category,limit_eur,revision,updated_at');
         if (sequence !== this.sequence || this.current()?.id !== owner) return;
         if (error) throw error;
-        if (!Array.isArray(data) || data.length !== categories.length || !data.every(validRow) || new Set(data.map(row => row.category)).size !== categories.length) throw new Error('Incomplete configuration');
+        if (!Array.isArray(data) || !data.every(validRow) || new Set(data.map(row => row.category)).size !== data.length
+          || categories().some(([key]) => !data.some(row => row.category === key))) throw new Error('Incomplete configuration');
         this.rows = new Map(data.map(row => [row.category, { ...row, limit_eur: row.limit_eur === null ? null : Number(row.limit_eur), revision: Number(row.revision) }]));
         this.status = 'ready';
       } catch (_) {
@@ -52,7 +48,7 @@
     async save(category, value, revision) {
       const profile = this.current();
       if (!editor(profile) || profile.id !== this.identity) throw new Error('Tu sesión no está autorizada para modificar límites. Vuelve a entrar en Finanzas.');
-      if (!names.has(category) || this.status !== 'ready' || !Number.isSafeInteger(revision) || revision < 0) throw new Error('Actualiza los límites antes de guardar.');
+      if (!categories().some(([key]) => key === category) || this.status !== 'ready' || !Number.isSafeInteger(revision) || revision < 0) throw new Error('Actualiza los límites antes de guardar.');
       const amount = parseLimit(value), owner = profile.id;
       let response;
       try { response = await window.supabaseClient.rpc('set_expense_category_limit', { p_category: category, p_limit_eur: amount, p_expected_revision: revision }); }
@@ -118,10 +114,10 @@
         return;
       }
       const list = el('div', undefined, 'space-y-3');
-      for (const [category, label] of categories) {
+      for (const [category, label] of categories()) {
         const row = this.service.rows.get(category), draft = this.drafts.get(category), message = this.messages.get(category);
         const form = el('form', undefined, 'rounded-2xl border border-slate-200 bg-white p-4');
-        const id = 'categoryLimit' + categories.findIndex(([key]) => key === category);
+        const id = 'categoryLimit' + categories().findIndex(([key]) => key === category);
         form.append(el('label', tr(label), 'block text-sm font-black text-slate-900', { for: id }));
         form.append(el('p', tr('Límite vigente') + ': ' + (row.limit_eur === null ? tr('Sin límite') : money(row.limit_eur)), 'mt-1 text-xs text-slate-600'));
         const controls = el('div', undefined, 'mt-3 flex flex-wrap items-center gap-2');

@@ -312,13 +312,7 @@
                       Categoría <span class="text-[#de4f5f]">*</span>
                     </label>
                     <select id="categoryInput" required class="block w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#de4f5f] font-bold text-slate-800 transition">
-                      <option value="Alojamiento">🏨 Alojamiento / Hotel</option>
-                      <option value="Transporte y Vuelos">✈️ Transporte y Vuelos</option>
-                      <option value="Comidas y Dietas">🍽️ Comidas y Dietas</option>
-                      <option value="Taxi y Movilidad">🚕 Taxi y Movilidad</option>
-                      <option value="Kilometraje">🚗 Kilometraje</option>
-                      <option value="Clientes y Comercial">🤝 Clientes y Comercial</option>
-                      <option value="Otros" selected>📦 Otros Gastos</option>
+                      <option value="">Cargando categorías...</option>
                     </select>
                   </div>
                 </div>
@@ -836,6 +830,7 @@
             <span>2. Usuarios & Contraseñas</span>
           </button>
           <button type="button" id="admSubTabRequests" class="adm-subtab px-4 py-2 text-xs sm:text-sm font-bold rounded-full bg-white text-slate-700 hover:bg-slate-100 border border-slate-300" data-subtab="requests">3. Solicitudes</button>
+          <button type="button" id="admSubTabCategories" class="adm-subtab px-4 py-2 text-xs sm:text-sm font-bold rounded-full bg-white text-slate-700 hover:bg-slate-100 border border-slate-300" data-subtab="categories">4. Categorías de gastos</button>
         </div>
 
         <!-- SECCIÓN 1: EMPLEADOS -->
@@ -870,6 +865,7 @@
         </div>
 
         <section id="admSectionRequests" class="space-y-4 hidden" aria-label="Gestión de solicitudes"></section>
+        <section id="admSectionCategories" class="space-y-4 hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm" aria-label="Categorías de gastos"></section>
 
         <!-- SECCIÓN 2: USUARIOS Y CONTRASEÑAS -->
         <div id="admSectionUsers" class="space-y-4 hidden">
@@ -1121,18 +1117,19 @@
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none"></div>
 
   <!-- SCRIPTS -->
-    <script src="js/i18n.js?v=20261023-multi-role"></script>
+    <script src="js/i18n.js?v=20261029-category-catalog"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1"></script>
   <script src="js/services/supabase.js"></script>
   <script src="js/services/exchangeRates.js"></script>
   <script src="js/services/auth.js?v=20261023-multi-role"></script>
-  <script src="js/services/db.js?v=20261023-multi-role"></script>
+  <script src="js/services/db.js?v=20261029-category-catalog"></script>
   <script src="js/services/excelExport.js?v=20261023-multi-role"></script>
   <script src="js/expenseDashboard.js?v=20261023-multi-role"></script>
-  <script src="js/categoryLimits.js?v=20261020-category-limits"></script>
+  <script src="js/categoryCatalog.js?v=20261029-category-catalog"></script>
+  <script src="js/categoryLimits.js?v=20261029-category-catalog"></script>
     <script src="js/expenseFolders.js?v=20261023-multi-role"></script>
   <script src="js/personalExpenses.js?v=20261023-multi-role"></script>
-  <script src="js/app.js?v=20261023-multi-role"></script>
+  <script src="js/app.js?v=20261029-category-catalog"></script>
   <script src="js/adminExpenses.js?v=20261023-multi-role"></script>
   <script src="js/services/adminUsers.js?v=20260922-session-directory"></script>
   <script src="js/adminPanel.js?v=20261023-multi-role"></script>

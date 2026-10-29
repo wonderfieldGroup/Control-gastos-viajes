@@ -19,6 +19,9 @@ test('Fortnight workflow: real PostgreSQL, RLS, atomic batches and preserved leg
  grant usage on schema public,auth,storage to authenticated,anon;`);
  await db.exec(read('supabase/schema.sql'));
  await db.exec(read('supabase/migrations/20260918_production_security_hardening.sql'));
+ await db.exec(read('supabase/expense-category-limits.sql'));
+ const catalogMigration=fs.readdirSync(path.join(root,'supabase/migrations')).find(s=>s.endsWith('_admin_expense_categories.sql'));
+ await db.exec(read('supabase/migrations/'+catalogMigration));
  await db.exec(read('supabase/migrations/20260920_receipt_upsert_policy.sql'));
  await db.exec(read('supabase/migrations/20260922_fix_receipt_folder_depth.sql'));
  const mail=read('supabase/email-notifications.sql').split('-- Cron executes as postgres.')[0].replace(/^create extension[^;]+;/gm,'');

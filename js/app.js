@@ -188,6 +188,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const admSectionUsers = document.getElementById('admSectionUsers');
   const admSubTabRequests = document.getElementById('admSubTabRequests');
   const admSectionRequests = document.getElementById('admSectionRequests');
+  const admSubTabCategories = document.getElementById('admSubTabCategories');
+  const admSectionCategories = document.getElementById('admSectionCategories');
   window.adminExpensePanel?.configure({refresh:loadAllExpenses});
 
   const areaManagersTableBody = document.getElementById('areaManagersTableBody');
@@ -227,6 +229,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const managerAnalytics = new window.ExpenseDashboard(document.getElementById('managerAnalytics'), 'manager', refreshAnalytics);
   const financeAnalytics = new window.ExpenseDashboard(document.getElementById('financeAnalytics'), 'finance', refreshAnalytics);
   const categoryLimits = window.categoryLimitService;
+  const categoryCatalog = window.categoryCatalog;
+  const adminCategoryPanel = new window.AdminCategoryPanel(admSectionCategories, categoryCatalog, loadAllExpenses);
+  window.adminCategoryPanel = adminCategoryPanel;
   const categoryLimitPanel = new window.CategoryLimitPanel(document.getElementById('financeCategoryLimits'), categoryLimits, loadAllExpenses);
   const batchService = window.expenseBatchService;
   let correctionSourceId = null;
@@ -479,6 +484,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Sub-Pestañas de Administrador
   admSubTabManagers.addEventListener('click', () => {
+    admSectionCategories.classList.add('hidden');
+    admSubTabCategories.className = 'adm-subtab px-4 py-2 text-xs sm:text-sm font-bold rounded-full bg-white text-slate-700 border border-slate-300';
     admSectionRequests.classList.add('hidden');
     admSubTabRequests.classList.remove('active','bg-[#433364]','text-white');
     admCurrentSubTab = 'managers';
@@ -490,6 +497,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   admSubTabUsers.addEventListener('click', () => {
+    admSectionCategories.classList.add('hidden');
+    admSubTabCategories.className = 'adm-subtab px-4 py-2 text-xs sm:text-sm font-bold rounded-full bg-white text-slate-700 border border-slate-300';
     admSectionRequests.classList.add('hidden');
     admSubTabRequests.classList.remove('active','bg-[#433364]','text-white');
     admCurrentSubTab = 'users';
@@ -501,6 +510,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   admSubTabRequests.addEventListener('click', () => {
+    admSectionCategories.classList.add('hidden');
+    admSubTabCategories.className = 'adm-subtab px-4 py-2 text-xs sm:text-sm font-bold rounded-full bg-white text-slate-700 border border-slate-300';
     admCurrentSubTab='requests';
     for(const button of [admSubTabManagers,admSubTabUsers]) {
       button.className='adm-subtab px-4 py-2 text-xs sm:text-sm font-bold rounded-full bg-white text-slate-700 hover:bg-slate-100 border border-slate-300';
@@ -511,7 +522,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.adminExpensePanel?.open();
   });
 
+  admSubTabCategories.addEventListener('click', () => {
+    admCurrentSubTab = 'categories';
+    for (const button of [admSubTabManagers, admSubTabUsers, admSubTabRequests]) {
+      button.className = 'adm-subtab px-4 py-2 text-xs sm:text-sm font-bold rounded-full bg-white text-slate-700 border border-slate-300';
+    }
+    admSubTabCategories.className = 'adm-subtab active px-4 py-2 text-xs sm:text-sm font-black rounded-full bg-[#433364] text-white';
+    for (const section of [admSectionManagers, admSectionUsers, admSectionRequests]) section.classList.add('hidden');
+    admSectionCategories.classList.remove('hidden');
+    adminCategoryPanel.render();
+  });
+
   function renderAdminDashboard() {
+    if(admCurrentSubTab==='categories') { adminCategoryPanel.render();return; }
     if(admCurrentSubTab==='requests') { window.adminExpensePanel?.refresh();return; }
     if (admCurrentSubTab === 'managers') {
       renderAreaManagersTable();
@@ -615,6 +638,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const profile = window.authService.getCurrentProfile();
     const ownerId = profile?.id || null;
     window.personalExpenseNavigation?.render();
+    await categoryCatalog.load(profile);
     // A configuration outage must not block expense submission or its refresh.
     const [snapshot] = await Promise.all([window.databaseService.getAll(), categoryLimits.load(profile), batchService.load(profile)]);
     // A fetch started by a previous account must never populate a new session.
@@ -1602,6 +1626,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const id = expenseIdInput.value || 'exp_' + Date.now();
+    if (categoryCatalog.status !== 'ready' || categoryCatalog.owner !== currentEmp.id || !categoryInput.value) {
+      showExpenseFormError('Selecciona una categoría disponible. Si no aparece ninguna, contacta con Admin.');
+      return;
+    }
     const docType = getSelectedDocType();
     const isInvoice = docType === 'factura';
     const hasIva = isInvoice && hasIvaToggle.checked;
@@ -1678,6 +1706,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     clearExpenseFormError();
     form.reset();
     expenseIdInput.value = '';
+    categoryCatalog.renderSelect('Otros');
     correctionSourceId = null;
     formTitle.textContent = 'Registrar Gasto de Viaje';
     btnSubmitText.textContent = 'Guardar borrador en su quincena';
@@ -1744,7 +1773,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     employeeInput.value = item.employee || '';
     tripInput.value = item.trip || '';
     dateInput.value = item.date || '';
-    categoryInput.value = item.category || 'Otros';
+    categoryCatalog.renderSelect(item.category || 'Otros');
     reasonInput.value = item.reason || '';
 
     amountInput.value = item.originalAmount;
@@ -1787,6 +1816,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if(!item || item.status!=='REJECTED')return;
     editExpense(id);
     expenseIdInput.value='';correctionSourceId=id;
+    categoryCatalog.renderSelect(item.category || 'Otros');
     formTitle.textContent='Corregir gasto rechazado';
   }
 

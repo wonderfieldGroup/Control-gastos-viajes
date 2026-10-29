@@ -77,6 +77,7 @@ class DatabaseService {
     if (error?.receiptCode && error.receiptPublicMessage) return error.receiptPublicMessage;
     const code = String(error?.statusCode || error?.status || error?.code || '');
     const detail = String(error?.message || error?.error || '');
+    if (code === '22023' && /category is unavailable/i.test(detail)) return 'Esta categoría ya no está disponible para nuevos gastos. Selecciona otra categoría y vuelve a guardar.';
     if (code === '413' || /payload too large|exceed.*(size|limit)|entity too large/i.test(detail)) return 'El servidor rechazó el tamaño del comprobante. El máximo permitido es 5 MB.';
     if (code === '415' || /mime.*not.*(allow|support)|invalid.*mime/i.test(detail)) return 'Formato no permitido. Adjunta una imagen JPEG/PNG o un PDF válido.';
     if (code === '401' || /^PGRST30/.test(code) || /jwt.*expired|invalid.*jwt|session.*expired/i.test(detail)) return 'Tu sesión ha caducado. Vuelve a iniciar sesión y reintenta el envío.';
