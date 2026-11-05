@@ -353,5 +353,90 @@ test('Fortnight workflow: real PostgreSQL, RLS, atomic batches and preserved leg
   await as(4,()=>assert.rejects(insert(814,'2024-09-12',4)));
   assert.equal((await db.query("select has_function_privilege('anon','private.can_report_expenses()','execute') allowed")).rows[0].allowed,false);
  });
+ await t.test('Country Finance and temporary cover isolate claims, receipts and actions', async () => {
+  await db.exec(read('supabase/migrations/20260918_admin_user_management.sql'));
+  const migration = fs.readdirSync(path.join(root, 'supabase/migrations')).find(name => name.endsWith('_country_finance_and_temporary_cover.sql'));
+  await db.exec(read('supabase/migrations/' + migration));
+  const scope = (user, country, finance) => db.query('select public.admin_set_workflow_scope($1,$2,$3)', [id(user), country, finance]);
+  const cover = (kind, principal, substitute, country, starts, ends) =>
+   db.query('select (public.admin_add_workflow_cover($1,$2,$3,$4,$5,$6)).id', [kind, id(principal), id(substitute), country, starts, ends]);
+  const setClock = day => db.exec("create or replace function private.workflow_cover_today() returns date language sql stable set search_path='' as $$select date '" + day + "'$$;");
+  await setClock('2030-01-01');
+  await db.query("insert into auth.users values($1,'no@example.invalid','{}')", [id(18)]);
+  await db.query("update public.profiles set role='employee', active=true, direct_boss_id=$1 where id=$2", [id(3), id(18)]);
+  await db.query('update public.profiles set direct_boss_id=$1 where id=$2', [id(3), id(6)]);
+  await as(1, () => assert.rejects(scope(1, 'ES', ['ES']), e => e.code === '42501'));
+  await as(0, () => assert.rejects(db.query('select public.my_workflow_access()'), e => e.code === '42501'));
+  await as(8, async () => {
+   for (const args of [[1,'ES',[]], [2,'ES',['ES','NO']], [3,'ES',[]], [5,'IT',['IT']], [6,'IT',[]], [18,'NO',[]]]) {
+    await scope(...args);
+   }
+   await assert.rejects(scope(1, 'ES', ['ES']), e => e.code === '22023');
+  });
+  await as(2, async () => {
+   const access = (await db.query('select public.my_workflow_access() as data')).rows[0].data;
+   assert.deepEqual(access.finance_countries.sort(), ['ES','NO']);
+   assert.deepEqual(access.manager_ids, [id(2)]);
+  });
+  for (const [owner, expense, batch] of [[1,840,850],[6,841,851],[18,842,852]]) {
+   await as(owner, async () => {
+    await insert(expense,'2024-09-12',owner);
+    const receipt = id(owner)+'/'+id(expense)+'/comprobante.png';
+    await db.query("insert into storage.objects values($1,$2,'receipts')",[id(expense+100),receipt]);
+    await db.query("update public.expenses set receipt_path=$1,receipt_name='comprobante.png',receipt_mime_type='image/png' where id=$2",[receipt,id(expense)]);
+    await submit([expense],batch,'INDIVIDUAL');
+   });
+  }
+  const canRead = (table, n) => db.query('select id from '+table+' where id=$1', [id(n)]).then(r => r.rows.length === 1);
+  await as(7, async () => {
+   assert.equal(await canRead('public.expenses', 842), false);
+   assert.equal(await canRead('storage.objects', 942), false);
+   await assert.rejects(review(852,null,'APPROVED',0), e => e.code === '42501');
+   await assert.rejects(cover('manager',3,7,null,'2030-01-02','2030-01-03'), e => e.code === '42501');
+  });
+  let financeCover;
+  await as(8, async () => {
+   await cover('manager',3,7,null,'2030-01-02','2030-01-03');
+   financeCover = (await cover('finance',2,7,'NO','2030-01-02','2030-01-03')).rows[0].id;
+   await assert.rejects(cover('manager',3,2,null,'2030-01-03','2030-01-04'), e => e.code === '23505');
+   await assert.rejects(cover('finance',2,7,'IT','2030-01-02','2030-01-03'), e => e.code === '22023');
+  });
+  await as(7, async () => assert.equal(await canRead('public.expense_batches', 852), false));
+  await setClock('2030-01-02');
+  await as(7, async () => {
+   assert.equal(await canRead('public.expense_batches', 852), true);
+   assert.equal(await canRead('storage.objects', 942), true);
+   await review(852,null,'APPROVED',0);
+   await review(851,null,'APPROVED',0);
+   await assert.rejects(pay(851,null,1), e => e.code === '42501');
+   await pay(852,null,1);
+  });
+  await as(2, async () => {
+   assert.equal(await canRead('public.expenses', 842), true);
+   assert.equal(await canRead('public.expenses', 841), false);
+   assert.equal(await canRead('storage.objects', 941), false);
+   await assert.rejects(pay(851,null,1), e => e.code === '42501');
+   await review(850,null,'APPROVED',0);
+  });
+  await as(5, async () => {
+   assert.equal(await canRead('public.expense_batches', 851), true);
+   assert.equal(await canRead('public.expense_batches', 850), false);
+   await assert.rejects(pay(850,null,1), e => e.code === '42501');
+   await pay(851,null,1);
+  });
+  assert.equal((await db.query('select paid_by from public.expenses where id=$1',[id(842)])).rows[0].paid_by, id(7));
+  await as(8, () => db.query('select public.admin_revoke_workflow_cover($1)', [financeCover]));
+  await as(7, async () => {
+   const access = (await db.query('select public.my_workflow_access() data')).rows[0].data;
+   assert.deepEqual(access.finance_countries, []);
+   assert.equal(await canRead('public.expenses', 842), true);
+  });
+  await setClock('2030-01-04');
+  await as(7, async () => {
+   assert.equal(await canRead('public.expenses', 842), false);
+   assert.equal(await canRead('storage.objects', 942), false);
+   assert.equal(await canRead('public.expense_batches', 852), false);
+  });
+ });
  await db.close();
 });
