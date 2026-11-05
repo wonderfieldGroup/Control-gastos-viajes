@@ -207,3 +207,58 @@ test('Calendar utility rejects invalid dates; folders translate; unavailable wor
  w.dispatchEvent(new w.CustomEvent('portal:reauth-required'));assert.equal(d.getElementById('employeeExpenseFolders').textContent,'');
  assert.deepEqual(f.errors,[]);await f.close();
 });
+
+test('Admin selects country scope and creates a dated Finance cover from the real controls', async () => {
+ const dom = new JSDOM('<section id="workflowCoverAdmin"></section><div id="managerDashboard"></div><div id="financeDashboard"></div>', {runScripts:'outside-only'});
+ const {window:w}=dom;
+ const profile = {id:'admin', role:'admin', status:'ACTIVE', workflowAccess:{today:'2030-01-01'}};
+ const directory = [
+  {id:'titular',role:'manager',status:'ACTIVE',name:'Titular',email:'titular@example.invalid',countryCode:'ES',financeCountries:['ES','NO']},
+  {id:'suplente',role:'manager',status:'ACTIVE',name:'Suplente',email:'suplente@example.invalid',countryCode:'NO',financeCountries:[]}
+ ];
+ const covers = [];
+ let rpcCall;
+ w.authService = {getCurrentProfile:()=>profile,getUsers:()=>directory,refreshDirectory:async()=>{},isAuthenticated:()=>true};
+ w.supabaseClient = {
+  from:()=>({select:()=>({order:async()=>({data:covers})})}),
+  rpc:async(name,args)=>{
+   rpcCall = {name,args};
+   if(name==='admin_add_workflow_cover') covers.push({id:'cover',kind:args.p_kind,principal_id:args.p_principal_id,substitute_id:args.p_substitute_id,country_code:args.p_country_code,starts_on:args.p_starts_on,ends_on:args.p_ends_on});
+   return {data:null};
+  }
+ };
+ try {
+  w.eval(source('js/workflowCover.js'));
+  await w.workflowCoverPanel.refresh();
+  const [scope,form] = w.document.querySelectorAll('form');
+  const [scopeUser,country] = scope.querySelectorAll('select');
+  scopeUser.value='titular';
+  scopeUser.dispatchEvent(new w.Event('change'));
+  assert.equal(country.value,'ES');
+  assert.deepEqual([...scope.querySelectorAll('input:checked')].map(c=>c.value), ['ES','NO']);
+  const [kind,principal,substitute,coverCountry] = form.querySelectorAll('select');
+  kind.value='finance';
+  kind.dispatchEvent(new w.Event('change'));
+  principal.value='titular';
+  principal.dispatchEvent(new w.Event('change'));
+  substitute.value='suplente';
+  coverCountry.value='NO';
+  const [start,end] = form.querySelectorAll('input[type=date]');
+  start.value='2030-01-02';
+  end.value='2030-01-08';
+  form.dispatchEvent(new w.Event('submit',{cancelable:true}));
+  for(let i=0;i<30&&!w.document.body.textContent.includes('Suplencia guardada.');i++)await new Promise(resolve=>setTimeout(resolve,10));
+  assert.equal(rpcCall.name,'admin_add_workflow_cover');
+  assert.equal(rpcCall.args.p_country_code,'NO');
+  assert.equal(rpcCall.args.p_ends_on,'2030-01-08');
+  assert.match(w.document.body.textContent,/Programada/);
+  profile.role='manager';
+  let opened;
+  w.portalWorkspace={open:value=>{opened=value;}};
+  w.workflowCoverPanel.renderNavigation();
+  const nav=w.document.getElementById('managerSwitchWorkflow');
+  assert.equal(nav.hidden,false);
+  nav.click();
+  assert.equal(opened,'finance');
+ } finally { w.close(); }
+});

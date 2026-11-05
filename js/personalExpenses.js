@@ -2,6 +2,7 @@
 (() => {
   'use strict';
   let rendering = false;
+  let returnRole;
   const tr = text => window.portalI18n?.t(text) || text;
   const allowed = () => window.authService?.canReportExpenses?.() === true;
   function hide(element, hidden) {
@@ -23,11 +24,14 @@
   function openPersonal() {
     const profile = window.authService?.getCurrentProfile?.();
     if (!allowed() || !['manager','finance'].includes(profile?.role) || profile.mustChangePassword) return;
+    returnRole = window.portalWorkspace?.current();
     window.portalWorkspace?.open('employee');
   }
   function back() {
     const profile = window.authService?.getCurrentProfile?.();
-    if (profile?.status === 'ACTIVE' && ['manager','finance'].includes(profile.role)) window.portalWorkspace?.open(profile.role);
+    if (profile?.status === 'ACTIVE' && ['manager','finance'].includes(profile.role)) {
+      window.portalWorkspace?.open(returnRole && window.authService.isAuthenticated?.(returnRole) ? returnRole : profile.role);
+    }
   }
   function render() {
     if (rendering) return; rendering = true;
@@ -35,9 +39,9 @@
       const profile = window.authService?.getCurrentProfile?.();
       for (const role of ['manager','finance']) {
         const b = button(role+'PersonalExpenses',document.getElementById(role+'Dashboard'),'Reportar mis gastos',openPersonal);
-        hide(b, profile?.role !== role || !allowed() || Boolean(profile.mustChangePassword));
+        hide(b, (profile?.role !== role && !window.authService.isAuthenticated?.(role)) || !allowed() || Boolean(profile.mustChangePassword));
       }
-      const b = button('returnToAssignedPanel',document.getElementById('empDashboard'),profile?.role==='finance'?'Volver a Finanzas':'Volver a mi panel Manager',back);
+      const b = button('returnToAssignedPanel',document.getElementById('empDashboard'),(returnRole || profile?.role)==='finance'?'Volver a Finanzas':'Volver a mi panel Manager',back);
       hide(b, !['manager','finance'].includes(profile?.role) || !allowed());
       if (profile && ['manager','finance'].includes(profile.role) && !allowed() && window.portalWorkspace?.current()==='employee') {
         window.portalWorkspace.open(profile.role);

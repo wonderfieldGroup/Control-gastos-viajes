@@ -22,7 +22,12 @@ class AuthService {
   }
   async refreshDirectory() {
     if (!this.profile) { this.directory = []; return []; }
-    const { data, error } = await this.client.from('profiles').select('*').order('full_name');
+    const actorId = this.profile.id;
+    const [{ data, error }, access] = await Promise.all([
+      this.client.from('profiles').select('*').order('full_name'),
+      this.client.rpc('my_workflow_access')
+    ]);
+    if (this.profile?.id !== actorId) return [];
     if (!error) {
       const rows = data || [];
       this.directory = rows.map(row => {
@@ -32,12 +37,14 @@ class AuthService {
           id: row.id, username: row.username || row.email, name: row.full_name, full_name: row.full_name,
           email: row.email, role: row.role, status: row.active ? 'ACTIVE' : 'INACTIVE',
           mustChangePassword: Boolean(row.must_change_password), expenseReportingEnabled: row.expense_reporting_enabled === true,
+          countryCode: row.country_code, financeCountries: row.finance_countries || [],
           region: row.region || 'General', directBoss: [boss?.full_name, secondBoss?.full_name].filter(Boolean).join(' y '), bossEmail: [boss?.email, secondBoss?.email].filter(Boolean).join(' / '),
           directBossId: row.direct_boss_id, secondaryBossId: row.secondary_boss_id, notes: row.notes || ''
         };
       });
       this.profile = this.directory.find(profile => profile.id === this.profile.id) || this.profile;
     }
+    this.profile.workflowAccess = access?.data || null;
     if (this.canReportExpenses() && (this.profile.directBossId || this.profile.secondaryBossId)) {
       const { data: managerData, error: managerError } = await this.client.functions.invoke('admin-user-management', { body: { action: 'get_my_managers' } });
       if (!managerError && Array.isArray(managerData?.managers)) {
@@ -67,7 +74,7 @@ class AuthService {
       await this.client.auth.signOut(); this.profile = null;
       return { success: false, message: 'Tu cuenta está desactivada. Contacta a TI.' };
     }
-    const allowed = role === 'employee' ? profile.role === 'employee' : profile.role === role || profile.role === 'admin';
+    const allowed = role === 'employee' ? profile.role === 'employee' : this.isAuthenticated(role);
     if (!allowed) { await this.client.auth.signOut(); this.profile = null; return { success: false, message: 'Tu cuenta no tiene permisos para este panel.' }; }
     return { success: true, user: profile, employee: profile };
   }
@@ -77,7 +84,13 @@ class AuthService {
       (['manager', 'finance'].includes(profile.role) && profile.expenseReportingEnabled === true)));
   }
   isEmployeeAuthenticated() { return this.canReportExpenses(); }
-  isAuthenticated(role) { return Boolean(this.profile && (this.profile.role === role || this.profile.role === 'admin')); }
+  isAuthenticated(role) {
+    const profile = this.profile;
+    return Boolean(profile?.status === 'ACTIVE' && (
+      profile.role === role || profile.role === 'admin' ||
+      (role === 'finance' && profile.workflowAccess?.finance_countries?.length)
+    ));
+  }
   getCurrentEmployee() { return this.isEmployeeAuthenticated() ? this.profile : null; }
   getCurrentProfile() { return this.profile; }
   getUser(role) { return this.isAuthenticated(role) ? this.profile : null; }
@@ -100,6 +113,7 @@ class AuthService {
     const secondBoss = this.directory.find(profile => profile.id === row.secondary_boss_id);
     return { id: row.id, username: row.username || row.email, name: row.full_name, full_name: row.full_name, email: row.email,
       role: row.role, status: row.active ? 'ACTIVE' : 'INACTIVE', mustChangePassword: Boolean(row.must_change_password), expenseReportingEnabled: row.expense_reporting_enabled === true,
+      countryCode: row.country_code, financeCountries: row.finance_countries || [],
       region: row.region || 'General', directBoss: [boss?.name, secondBoss?.name].filter(Boolean).join(' y '),
       bossEmail: [boss?.email, secondBoss?.email].filter(Boolean).join(' / '), directBossId: row.direct_boss_id, secondaryBossId: row.secondary_boss_id, notes: row.notes || '' };
   }
