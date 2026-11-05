@@ -501,6 +501,188 @@
     ['Selecciona una categoría disponible. Si no aparece ninguna, contacta con Admin.','Select an available category. If none appear, contact Admin.','Seleziona una categoria disponibile. Se non ne appare nessuna, contatta Admin.'],
     ['Esta categoría ya no está disponible para nuevos gastos. Selecciona otra categoría y vuelve a guardar.','This category is no longer available for new expenses. Select another category and save again.','Questa categoria non è più disponibile per nuove spese. Seleziona un’altra categoria e salva di nuovo.']
   ]) translations.set(es,{en,it});
+  for (const [es,en,it] of [
+  [
+    "Países y suplencias",
+    "Countries and temporary cover",
+    "Paesi e sostituzioni"
+  ],
+  [
+    "Finanzas ve los gastos del país asignado a cada solicitante.",
+    "Finance sees expenses for each claimant’s assigned country.",
+    "Finanza vede le spese del paese assegnato a ciascun richiedente."
+  ],
+  [
+    "Países de una cuenta",
+    "Account countries",
+    "Paesi dell’account"
+  ],
+  [
+    "País del solicitante",
+    "Claimant country",
+    "Paese del richiedente"
+  ],
+  [
+    "Países autorizados en Finanzas",
+    "Authorised Finance countries",
+    "Paesi autorizzati in Finanza"
+  ],
+  [
+    "Sin país asignado",
+    "No country assigned",
+    "Nessun paese assegnato"
+  ],
+  [
+    "Guardar países",
+    "Save countries",
+    "Salva paesi"
+  ],
+  [
+    "Países guardados.",
+    "Countries saved.",
+    "Paesi salvati."
+  ],
+  [
+    "Programar suplencia",
+    "Schedule temporary cover",
+    "Programma sostituzione"
+  ],
+  [
+    "Rol de la suplencia",
+    "Cover role",
+    "Ruolo della sostituzione"
+  ],
+  [
+    "Titular",
+    "Primary assignee",
+    "Titolare"
+  ],
+  [
+    "Suplente",
+    "Substitute",
+    "Sostituto"
+  ],
+  [
+    "Selecciona titular",
+    "Select primary assignee",
+    "Seleziona il titolare"
+  ],
+  [
+    "Selecciona suplente",
+    "Select substitute",
+    "Seleziona il sostituto"
+  ],
+  [
+    "Selecciona una cuenta",
+    "Select an account",
+    "Seleziona un account"
+  ],
+  [
+    "Selecciona país",
+    "Select a country",
+    "Seleziona un paese"
+  ],
+  [
+    "País de Finanzas",
+    "Finance country",
+    "Paese di Finanza"
+  ],
+  [
+    "Hasta inclusive",
+    "Through and including",
+    "Fino al giorno incluso"
+  ],
+  [
+    "Las fechas se aplican en horario de Madrid.",
+    "Dates follow Madrid time.",
+    "Le date seguono l’orario di Madrid."
+  ],
+  [
+    "Guardar suplencia",
+    "Save temporary cover",
+    "Salva sostituzione"
+  ],
+  [
+    "Suplencia guardada.",
+    "Temporary cover saved.",
+    "Sostituzione salvata."
+  ],
+  [
+    "Suplencias registradas",
+    "Scheduled cover",
+    "Sostituzioni registrate"
+  ],
+  [
+    "No hay suplencias registradas.",
+    "No cover assignments yet.",
+    "Nessuna sostituzione registrata."
+  ],
+  [
+    "Cuenta retirada",
+    "Removed account",
+    "Account rimosso"
+  ],
+  [
+    "Programada",
+    "Scheduled",
+    "Programmata"
+  ],
+  [
+    "Vigente",
+    "Active",
+    "Attiva"
+  ],
+  [
+    "Finalizada",
+    "Ended",
+    "Terminata"
+  ],
+  [
+    "Cancelada",
+    "Cancelled",
+    "Annullata"
+  ],
+  [
+    "Cancelar suplencia",
+    "Cancel temporary cover",
+    "Annulla sostituzione"
+  ],
+  [
+    "¿Cancelar esta suplencia?",
+    "Cancel this cover assignment?",
+    "Annullare questa sostituzione?"
+  ],
+  [
+    "Suplencia cancelada.",
+    "Temporary cover cancelled.",
+    "Sostituzione annullata."
+  ],
+  [
+    "Ya existe una suplencia para ese titular y periodo.",
+    "This assignee already has cover for that period.",
+    "Esiste già una sostituzione per il titolare e il periodo."
+  ],
+  [
+    "No se pudo guardar el cambio. Revisa los datos e inténtalo de nuevo.",
+    "The change could not be saved. Check the details and try again.",
+    "Impossibile salvare la modifica. Controlla i dati e riprova."
+  ],
+  [
+    "No se pudieron cargar las suplencias.",
+    "Could not load cover assignments.",
+    "Impossibile caricare le sostituzioni."
+  ],
+  [
+    "Abrir Finanzas",
+    "Open Finance",
+    "Apri Finanza"
+  ],
+  [
+    "Manager",
+    "Manager",
+    "Responsabile"
+  ]
+]) translations.set(es,{en,it});
   const fragments = [...translations].sort((a, b) => b[0].length - a[0].length);
   const supported = new Set(['es', 'en', 'it']);
   const storageKey = 'wonderfield.portal.language';
