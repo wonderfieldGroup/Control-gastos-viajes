@@ -190,6 +190,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const admSectionRequests = document.getElementById('admSectionRequests');
   const admSubTabCategories = document.getElementById('admSubTabCategories');
   const admSectionCategories = document.getElementById('admSectionCategories');
+  const admSubTabCover = document.getElementById('admSubTabCover');
+  const admSectionCover = document.getElementById('workflowCoverAdmin');
   window.adminExpensePanel?.configure({refresh:loadAllExpenses});
 
   const areaManagersTableBody = document.getElementById('areaManagersTableBody');
@@ -304,9 +306,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ----------------------------------------------------
   function queueExpenses(role) {
     const profile = window.authService.getCurrentProfile();
-    return expenses.filter(e => !e.isDraft && (role === 'manager' ? e.employeeId !== profile?.id :
-      (!e.batchId || batchService.rows.some(b => b.id === e.batchId && b.released_at)) &&
-      (['APPROVED','PAID'].includes(e.status) || e.financeDecision === 'REJECTED')));
+    const access = profile?.workflowAccess;
+    const owners = new Map(window.authService.getUsers().map(user => [user.id, user]));
+    return expenses.filter(expense => {
+      if (expense.isDraft || expense.employeeId === profile?.id) return false;
+      const owner = owners.get(expense.employeeId);
+      const scoped = access && profile.role !== 'admin';
+      if (role === 'manager') {
+        return !scoped || access.manager_ids.some(id => id === owner?.directBossId || id === owner?.secondaryBossId);
+      }
+      return (!scoped || access.finance_countries.includes(owner?.countryCode)) &&
+        (!expense.batchId || batchService.rows.some(batch => batch.id === expense.batchId && batch.released_at)) &&
+        (['APPROVED', 'PAID'].includes(expense.status) || expense.financeDecision === 'REJECTED');
+    });
   }
   function switchTab(tabName) {
     const profile = window.authService.getCurrentProfile();
@@ -333,6 +345,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (tabName === 'employee') renderEmployeeView();
 
     window.personalExpenseNavigation?.render();
+    window.workflowCoverPanel?.renderNavigation();
     lucide.createIcons();
   }
   window.portalWorkspace = { open: switchTab, current: () => currentActiveTab };
@@ -477,12 +490,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   btnAdminLogout.addEventListener('click', async () => {
     window.adminExpensePanel?.clear();
+    window.workflowCoverPanel?.clear();
     await window.authService.logout();
     showToast('Sesión de administrador cerrada', 'info');
     renderAdminView();
   });
 
   // Sub-Pestañas de Administrador
+  const adminTabIdle = 'adm-subtab px-4 py-2 text-xs sm:text-sm font-bold rounded-full bg-white text-slate-700 border border-slate-300';
+  const adminTabActive = 'adm-subtab active px-4 py-2 text-xs sm:text-sm font-black rounded-full bg-[#433364] text-white';
+  for (const button of [admSubTabManagers, admSubTabUsers, admSubTabRequests, admSubTabCategories]) {
+    button.addEventListener('click', () => {
+      admSectionCover.classList.add('hidden');
+      admSubTabCover.className = adminTabIdle;
+    });
+  }
+  admSubTabCover.addEventListener('click', () => {
+    admCurrentSubTab = 'cover';
+    for (const button of [admSubTabManagers, admSubTabUsers, admSubTabRequests, admSubTabCategories]) button.className = adminTabIdle;
+    for (const section of [admSectionManagers, admSectionUsers, admSectionRequests, admSectionCategories]) section.classList.add('hidden');
+    admSubTabCover.className = adminTabActive;
+    admSectionCover.classList.remove('hidden');
+    window.workflowCoverPanel?.refresh();
+  });
   admSubTabManagers.addEventListener('click', () => {
     admSectionCategories.classList.add('hidden');
     admSubTabCategories.className = 'adm-subtab px-4 py-2 text-xs sm:text-sm font-bold rounded-full bg-white text-slate-700 border border-slate-300';
@@ -534,6 +564,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   function renderAdminDashboard() {
+    if (admCurrentSubTab === 'cover') return;
     if(admCurrentSubTab==='categories') { adminCategoryPanel.render();return; }
     if(admCurrentSubTab==='requests') { window.adminExpensePanel?.refresh();return; }
     if (admCurrentSubTab === 'managers') {
@@ -638,6 +669,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const profile = window.authService.getCurrentProfile();
     const ownerId = profile?.id || null;
     window.personalExpenseNavigation?.render();
+    if (currentActiveTab === 'finance' && profile && !window.authService.isAuthenticated('finance')) switchTab(profile.role);
+    window.workflowCoverPanel?.renderNavigation();
     await categoryCatalog.load(profile);
     // A configuration outage must not block expense submission or its refresh.
     const [snapshot] = await Promise.all([window.databaseService.getAll(), categoryLimits.load(profile), batchService.load(profile)]);
@@ -1031,6 +1064,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateAnalytics(financeAnalytics);
     window.personalExpenseNavigation?.render();
     categoryLimitPanel.render();
+    const canEditLimits = ['finance', 'admin'].includes(window.authService.getCurrentProfile()?.role);
+    document.getElementById('finViewLimits').classList.toggle('hidden', !canEditLimits);
+    if (!canEditLimits && financeWorkspaceView === 'limits') financeWorkspaceView = 'queue';
     const analyticsVisible = financeWorkspaceView === 'analytics';
     const limitsVisible = financeWorkspaceView === 'limits';
     document.getElementById('financeAnalyticsPanel').classList.toggle('hidden', !analyticsVisible);
