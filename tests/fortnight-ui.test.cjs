@@ -107,7 +107,8 @@ test('Admin organigram displays both assigned managers and unassigned employees 
  const org=d.getElementById('admSectionOrg');
  assert.equal(org.classList.contains('hidden'),false);
  assert.match(org.textContent,/Daniel/);assert.match(org.textContent,/Piero/);
- assert.equal(org.querySelectorAll('li').length,2);assert.equal(org.querySelector('img'),null);
+ assert.match(org.textContent,/Segundo aprobador: Piero/);assert.equal(org.querySelector('img'),null);
+ assert.equal(org.querySelectorAll('ul ul li').length,1);
  assert.match(org.textContent,/Pendiente/);
  d.getElementById('admSubTabUsers').click();assert.equal(org.classList.contains('hidden'),true);
  await f.close();
