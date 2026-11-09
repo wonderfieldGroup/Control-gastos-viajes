@@ -531,16 +531,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     const sort = list => list.sort((a,b) => (a.name || '').localeCompare(b.name || ''));
     const rendered = new Set();
     const roleName = {manager:'Manager',employee:'Empleado',finance:'Finanzas'};
+    const countryNames = new Intl.DisplayNames(['es'], {type:'region'});
+    function personName(person) {
+      const name = document.createElement('div'); name.className = 'org-person-name';
+      const code = person.countryCode;
+      if (typeof code === 'string' && /^[A-Z]{2}$/.test(code)) {
+        const flag = document.createElement('span'); flag.className = 'org-person-flag';
+        flag.textContent = String.fromCodePoint(...[...code].map(char => 127397 + char.charCodeAt(0)));
+        flag.setAttribute('role', 'img'); flag.setAttribute('aria-label', countryNames.of(code) || code); flag.title = countryNames.of(code) || code;
+        name.append(flag, document.createTextNode(' '));
+      }
+      name.append(document.createTextNode(person.name || 'Sin nombre'));
+      return name;
+    }
+    function financeLabel(person) {
+      if (!person.countryCode) return 'País pendiente · Finanzas sin determinar';
+      const names = sort(users.filter(u => u.status === 'ACTIVE' && Array.isArray(u.financeCountries) && u.financeCountries.includes(person.countryCode))).map(u => u.name);
+      return 'Finanzas por país: ' + (names.length ? names.join(', ') : 'Sin asignar');
+    }
     function branch(person, path = new Set()) {
       const li = document.createElement('li'); li.className = 'org-node';
       const box = document.createElement('div'); box.className = 'org-person';
-      const name = document.createElement('div'); name.className = 'org-person-name'; name.textContent = person.name || 'Sin nombre';
+      const name = personName(person);
       const details = document.createElement('div'); details.className = 'org-person-role';
       details.textContent = (roleName[person.role] || person.role || '') + (person.status === 'INACTIVE' ? ' · Inactivo' : '');
       box.append(name, details);
       if (person.secondaryBossId && byId.has(person.secondaryBossId)) {
         const extra = document.createElement('div'); extra.className = 'org-person-extra'; extra.textContent = 'Segundo aprobador: ' + byId.get(person.secondaryBossId).name; box.append(extra);
       }
+      const finance = document.createElement('div'); finance.className = 'org-person-finance'; finance.textContent = financeLabel(person); box.append(finance);
       li.append(box); rendered.add(person.id);
       const nextPath = new Set(path); nextPath.add(person.id);
       const descendants = sort((children.get(person.id) || []).filter(child => !nextPath.has(child.id)));
@@ -557,7 +576,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (pending.length) {
       const title = document.createElement('h4'); title.className = 'border-t pt-4 font-black text-[#72578f]'; title.textContent = 'Sin relación de aprobación asignada'; card.append(title);
       const unassigned = document.createElement('ul'); unassigned.className = 'mt-3 grid gap-2 sm:grid-cols-2';
-      for (const person of pending) { const item = document.createElement('li'); item.className = 'rounded-xl bg-slate-50 px-4 py-3 text-sm'; item.textContent = person.name + ' · ' + (roleName[person.role] || person.role || ''); unassigned.append(item); }
+      for (const person of pending) { const item = document.createElement('li'); item.className = 'rounded-xl bg-slate-50 px-4 py-3 text-sm'; const name = personName(person); const role = document.createElement('div'); role.className = 'org-person-role'; role.textContent = roleName[person.role] || person.role || ''; const finance = document.createElement('div'); finance.className = 'org-person-finance'; finance.textContent = financeLabel(person); item.append(name, role, finance); unassigned.append(item); }
       card.append(unassigned);
     }
     admSectionOrg.append(card);
