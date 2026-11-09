@@ -23,9 +23,10 @@ class AuthService {
   async refreshDirectory() {
     if (!this.profile) { this.directory = []; return []; }
     const actorId = this.profile.id;
-    const [{ data, error }, access] = await Promise.all([
+    const [{ data, error }, access, managerNames] = await Promise.all([
       this.client.from('profiles').select('*').order('full_name'),
-      this.client.rpc('my_workflow_access')
+      this.client.rpc('my_workflow_access'),
+      this.client.rpc('dashboard_manager_names')
     ]);
     if (this.profile?.id !== actorId) return [];
     if (!error) {
@@ -45,6 +46,7 @@ class AuthService {
       this.profile = this.directory.find(profile => profile.id === this.profile.id) || this.profile;
     }
     this.profile.workflowAccess = access?.data || null;
+    this.profile.dashboardManagerNames = !managerNames?.error && Array.isArray(managerNames?.data) ? managerNames.data : [];
     if (this.canReportExpenses() && (this.profile.directBossId || this.profile.secondaryBossId)) {
       const { data: managerData, error: managerError } = await this.client.functions.invoke('admin-user-management', { body: { action: 'get_my_managers' } });
       if (!managerError && Array.isArray(managerData?.managers)) {
