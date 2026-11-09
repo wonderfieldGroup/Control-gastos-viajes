@@ -119,7 +119,8 @@
       this.render();
     }
     update(rows, profile, directory) {
-      const allowed = profile?.status === 'ACTIVE' && (profile.role === this.mode || profile.role === 'admin');
+      const allowed = profile?.status === 'ACTIVE' && (profile.role === this.mode || profile.role === 'admin' ||
+        (this.mode === 'finance' && profile.workflowAccess?.finance_countries?.length > 0));
       if (!allowed || !profile.id) { this.clear(); return; }
       if (profile.id !== this.identity) { this.filters = defaultFilters(); this.page = 0; }
       this.identity = profile.id;
