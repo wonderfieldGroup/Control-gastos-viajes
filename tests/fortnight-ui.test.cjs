@@ -98,6 +98,20 @@ async function fixture(role='employee',reporting=false){
  w.document.getElementById(role==='employee'?'navTabEmployee':role==='manager'?'navTabManager':role==='admin'?'navTabAdmin':'navTabFinance').click();await tick();
  return {w,rows,batches,errors,rpcCalls,offline:value=>{offline=value;},setProfile:value=>{profile=value;},close:async()=>{observers.forEach(o=>o.disconnect());await tick();observers.forEach(o=>o.disconnect());w.close();}};
 }
+test('Admin organigram displays both assigned managers and unassigned employees safely',async()=>{
+ const f=await fixture('admin'),d=f.w.document;
+ f.w.authService.getUsers=()=>[{id:'m1',name:'Daniel',role:'manager'},{id:'m2',name:'Piero',role:'manager'},
+  {id:'e',name:'<img src=x>',role:'employee',directBossId:'m1',secondaryBossId:'m2'},
+  {id:'pending',name:'Pendiente',role:'employee'}];
+ d.getElementById('admSubTabOrg').click();
+ const org=d.getElementById('admSectionOrg');
+ assert.equal(org.classList.contains('hidden'),false);
+ assert.match(org.textContent,/Daniel/);assert.match(org.textContent,/Piero/);
+ assert.equal(org.querySelectorAll('li').length,2);assert.equal(org.querySelector('img'),null);
+ assert.match(org.textContent,/Pendiente/);
+ d.getElementById('admSubTabUsers').click();assert.equal(org.classList.contains('hidden'),true);
+ await f.close();
+});
 test('Full employee form saves a private draft, does not submit to manager, and groups by old expense date',async()=>{
  const f=await fixture(),d=f.w.document;
  assert.ok(d.querySelector('#employeeExpenseFolders details[data-key="draft:2024-09-01"]'));

@@ -192,6 +192,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const admSectionCategories = document.getElementById('admSectionCategories');
   const admSubTabCover = document.getElementById('admSubTabCover');
   const admSectionCover = document.getElementById('workflowCoverAdmin');
+  const admSubTabOrg = document.getElementById('admSubTabOrg');
+  const admSectionOrg = document.getElementById('admSectionOrg');
   window.adminExpensePanel?.configure({refresh:loadAllExpenses});
 
   const areaManagersTableBody = document.getElementById('areaManagersTableBody');
@@ -499,11 +501,43 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Sub-Pestañas de Administrador
   const adminTabIdle = 'adm-subtab px-4 py-2 text-xs sm:text-sm font-bold rounded-full bg-white text-slate-700 border border-slate-300';
   const adminTabActive = 'adm-subtab active px-4 py-2 text-xs sm:text-sm font-black rounded-full bg-[#433364] text-white';
-  for (const button of [admSubTabManagers, admSubTabUsers, admSubTabRequests, admSubTabCategories]) {
+  for (const button of [admSubTabManagers, admSubTabUsers, admSubTabRequests, admSubTabCategories, admSubTabCover]) {
     button.addEventListener('click', () => {
+      admSectionOrg.classList.add('hidden');
+      admSubTabOrg.className = adminTabIdle;
       admSectionCover.classList.add('hidden');
       admSubTabCover.className = adminTabIdle;
     });
+  }
+  admSubTabOrg.addEventListener('click', () => {
+    admCurrentSubTab = 'organigrama';
+    for (const button of [admSubTabManagers, admSubTabUsers, admSubTabRequests, admSubTabCategories, admSubTabCover]) button.className = adminTabIdle;
+    for (const section of [admSectionManagers, admSectionUsers, admSectionRequests, admSectionCategories, admSectionCover]) section.classList.add('hidden');
+    admSubTabOrg.className = adminTabActive;
+    admSectionOrg.classList.remove('hidden');
+    renderOrganigrama();
+  });
+  function renderOrganigrama() {
+    const users = window.authService.getUsers().filter(u => u.role !== 'admin');
+    const byId = new Map(users.map(u => [u.id, u]));
+    admSectionOrg.replaceChildren();
+    const card = document.createElement('div');
+    card.className = 'bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4';
+    const heading = document.createElement('h3'); heading.className = 'font-black text-lg'; heading.textContent = 'Organigrama de aprobación';
+    const description = document.createElement('p'); description.className = 'text-sm text-slate-600'; description.textContent = 'Relaciones asignadas en el portal. Las cuentas sin manager aparecen como pendientes.';
+    card.append(heading, description);
+    for (const manager of users.filter(u => users.some(p => p.directBossId === u.id || p.secondaryBossId === u.id)).sort((a,b) => a.name.localeCompare(b.name))) {
+      const group = document.createElement('section'); group.className = 'rounded-xl border border-slate-200 p-4';
+      const title = document.createElement('h4'); title.className = 'font-black text-[#433364]'; title.textContent = manager.name;
+      const list = document.createElement('ul'); list.className = 'mt-2 grid gap-2 sm:grid-cols-2';
+      for (const person of users.filter(p => p.directBossId === manager.id || p.secondaryBossId === manager.id).sort((a,b) => a.name.localeCompare(b.name))) {
+        const item = document.createElement('li'); item.className = 'rounded-lg bg-slate-50 p-2 text-sm'; item.textContent = person.name + (person.secondaryBossId === manager.id ? ' · segundo manager' : ''); list.append(item);
+      }
+      group.append(title,list); card.append(group);
+    }
+    const pending = users.filter(u => ((!u.directBossId && (u.role === 'employee' || u.expenseReportingEnabled)) || (u.directBossId && !byId.has(u.directBossId))));
+    const note = document.createElement('p'); note.className = 'text-sm text-slate-600'; note.textContent = 'Sin manager asignado o pendiente: ' + (pending.map(u => u.name).join(', ') || 'ninguno'); card.append(note);
+    admSectionOrg.append(card);
   }
   admSubTabCover.addEventListener('click', () => {
     admCurrentSubTab = 'cover';
@@ -564,6 +598,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   function renderAdminDashboard() {
+    if (admCurrentSubTab === 'organigrama') { renderOrganigrama(); return; }
     if (admCurrentSubTab === 'cover') return;
     if(admCurrentSubTab==='categories') { adminCategoryPanel.render();return; }
     if(admCurrentSubTab==='requests') { window.adminExpensePanel?.refresh();return; }
