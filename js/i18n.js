@@ -475,6 +475,22 @@
   for (const [es,en,it] of folderMessages) translations.set(es,{en,it});
   for (const [es,en,it] of [["Reportar mis gastos","Report my expenses","Segnala le mie spese"],["Volver a Finanzas","Back to Finance","Torna a Finanza"],["Volver a mi panel Manager","Back to my Manager dashboard","Torna al pannello Manager"],["Permitir reportar sus propios gastos","Allow reporting personal expenses","Consenti la segnalazione delle proprie spese"],["Asigna un Manager o director aprobador distinto del solicitante. Los directores deben tener un perfil Manager.","Assign a Manager or director other than the requester as approver. Directors must use a Manager profile.","Assegna un Manager o direttore diverso dal richiedente come approvatore. I direttori devono avere un profilo Manager."],["Selecciona un Manager aprobador","Select an approving Manager","Seleziona un Manager approvatore"],["Reporta gastos","Reports expenses","Segnala spese"],["No habilitado","Not enabled","Non abilitato"],["Habilitado","Enabled","Abilitato"],["No puedes aprobar, rechazar ni marcar como pagados tus propios gastos.","You cannot approve, reject or mark your own expenses as paid.","Non puoi approvare, rifiutare o segnare come pagate le tue spese."]]) translations.set(es,{en,it});
   for (const [es,en,it] of [
+  ['Suplencias','Substitutions','Sostituzioni'],
+  ['La persona suplente tendrá el alcance del titular mientras la suplencia esté activa.','The substitute receives the primary person’s scope while the substitution is active.','Il sostituto riceve l’ambito del titolare mentre la sostituzione è attiva.'],
+  ['La persona suplente tendrá el alcance completo de la función elegida mientras la suplencia esté activa.','The substitute receives the full scope of the selected role while the substitution is active.','Il sostituto riceve l’intero ambito del ruolo scelto mentre la sostituzione è attiva.'],
+  ['Buscar titular','Search primary person','Cerca titolare'],
+  ['Buscar suplente','Search substitute','Cerca sostituto'],
+  ['Sin fecha de inicio','No start date','Senza data di inizio'],
+  ['Sin fecha de fin','No end date','Senza data di fine'],
+  ['Activar','Activate','Attiva'],
+  ['Desactivar','Deactivate','Disattiva'],
+  ['Activa','Active','Attiva'],
+  ['Activada','Enabled','Attivata'],
+  ['Desactivada','Disabled','Disattivata'],
+  ['Suplencia activada.','Substitution enabled.','Sostituzione attivata.'],
+  ['Suplencia desactivada.','Substitution disabled.','Sostituzione disattivata.'],
+  ['Volver a mis gastos','Back to my expenses','Torna alle mie spese'],
+  ['Fechas opcionales; se aplican en horario de Madrid. Sin fecha de fin, permanece activa hasta desactivarla.','Optional dates use Madrid time. Without an end date, the substitution remains active until disabled.','Le date facoltative seguono l’ora di Madrid. Senza data di fine, la sostituzione resta attiva fino alla disattivazione.'],
     ['Categorías de gastos','Expense categories','Categorie di spesa'],
     ['Cargando categorías...','Loading categories...','Caricamento categorie...'],
     ['Añade o retira las categorías disponibles para todos los empleados. Los gastos anteriores y los límites de Finanzas se conservan.','Add or remove the categories available to all employees. Existing expenses and Finance limits are preserved.','Aggiungi o rimuovi le categorie disponibili per tutti i dipendenti. Le spese precedenti e i limiti di Finanza vengono conservati.'],
