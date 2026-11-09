@@ -13,6 +13,18 @@ test('Finance dashboard accepts effective delegated access and clears it when re
   dashboard.update([row],{...profile,workflowAccess:{finance_countries:[]}},[]);assert.equal(dashboard.filtered.length,0);
  } finally { w.close(); }
 });
+test('Dashboard and CSV resolve the authorized substitute manager name',()=>{
+ const dom=new JSDOM('<div id="dashboard"></div>',{url:'https://qa.example.invalid',runScripts:'outside-only'}),w=dom.window;
+ try {
+  w.eval(source('js/expenseDashboard.js'));
+  const dashboard=new w.ExpenseDashboard(w.document.getElementById('dashboard'),'manager',async()=>{});
+  const profile={id:'substitute',role:'manager',status:'ACTIVE',dashboardManagerNames:[{id:'boss',full_name:'Manager Titular'}]};
+  const directory=[{id:'employee',name:'Empleado',directBossId:'boss'}];
+  dashboard.update([{id:'e',employeeId:'employee',date:'2026-01-05',status:'APPROVED',amountEUR:20,category:'Comidas'}],profile,directory);
+  assert.match(dashboard.csv(),/Manager Titular/); assert.doesNotMatch(dashboard.csv(),/Manager no disponible/);
+  dashboard.update([], {...profile,status:'INACTIVE'},directory);assert.equal(dashboard.directory.size,0);
+ } finally { w.close(); }
+});
 test('Finance Excel export matches the selected status, trip and search filters',async()=>{
  const f=await fixture('finance'),w=f.w,d=w.document;let exported=[];
  w.excelExportService={exportToExcel:(rows,trip,label)=>exported.push({rows,trip,label})};
