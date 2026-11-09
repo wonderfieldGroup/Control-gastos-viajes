@@ -544,11 +544,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       name.append(document.createTextNode(person.name || 'Sin nombre'));
       return name;
     }
-    function financeLabel(person) {
-      if (!person.countryCode) return 'País pendiente · Finanzas sin determinar';
-      const names = sort(users.filter(u => u.status === 'ACTIVE' && Array.isArray(u.financeCountries) && u.financeCountries.includes(person.countryCode))).map(u => u.name);
-      return 'Finanzas por país: ' + (names.length ? names.join(', ') : 'Sin asignar');
+    const financeSection = document.createElement('section'); financeSection.className = 'org-finance-section';
+    const financeTitle = document.createElement('h4'); financeTitle.className = 'org-finance-title'; financeTitle.textContent = 'Finanzas por país';
+    const financeNote = document.createElement('p'); financeNote.className = 'org-finance-note'; financeNote.textContent = 'Responsables asignados por país. Las suplencias temporales no se muestran aquí.';
+    const financeGrid = document.createElement('ul'); financeGrid.className = 'org-finance-grid';
+    const codes = new Set();
+    for (const u of users) {
+      if (typeof u.countryCode === 'string' && /^[A-Z]{2}$/.test(u.countryCode)) codes.add(u.countryCode);
+      if (u.status === 'ACTIVE' && Array.isArray(u.financeCountries)) for (const code of u.financeCountries) if (typeof code === 'string' && /^[A-Z]{2}$/.test(code)) codes.add(code);
     }
+    for (const code of [...codes].sort((a,b) => (countryNames.of(a) || a).localeCompare(countryNames.of(b) || b, 'es'))) {
+      const item = document.createElement('li'); item.className = 'org-finance-country';
+      const title = document.createElement('div'); title.className = 'org-finance-country-name';
+      title.textContent = String.fromCodePoint(...[...code].map(char => 127397 + char.charCodeAt(0))) + ' ' + (countryNames.of(code) || code);
+      const names = sort(users.filter(u => u.status === 'ACTIVE' && Array.isArray(u.financeCountries) && u.financeCountries.includes(code))).map(u => u.name || 'Sin nombre');
+      const people = document.createElement('div'); people.className = 'org-finance-people'; people.textContent = names.length ? names.join(', ') : 'Sin asignar';
+      item.append(title, people); financeGrid.append(item);
+    }
+    if (!codes.size) { const empty = document.createElement('li'); empty.className = 'org-finance-people'; empty.textContent = 'No hay países asignados todavía.'; financeGrid.append(empty); }
+    financeSection.append(financeTitle, financeNote, financeGrid); card.append(financeSection);
     function branch(person, path = new Set()) {
       const li = document.createElement('li'); li.className = 'org-node';
       const box = document.createElement('div'); box.className = 'org-person';
@@ -556,10 +570,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       const details = document.createElement('div'); details.className = 'org-person-role';
       details.textContent = (roleName[person.role] || person.role || '') + (person.status === 'INACTIVE' ? ' · Inactivo' : '');
       box.append(name, details);
+      if (path.size === 1 && byId.has(person.directBossId)) {
+        const boss = document.createElement('div'); boss.className = 'org-person-boss'; boss.textContent = 'Reporta a ' + byId.get(person.directBossId).name; box.append(boss);
+      }
       if (person.secondaryBossId && byId.has(person.secondaryBossId)) {
         const extra = document.createElement('div'); extra.className = 'org-person-extra'; extra.textContent = 'Segundo aprobador: ' + byId.get(person.secondaryBossId).name; box.append(extra);
       }
-      const finance = document.createElement('div'); finance.className = 'org-person-finance'; finance.textContent = financeLabel(person); box.append(finance);
       li.append(box); rendered.add(person.id);
       const nextPath = new Set(path); nextPath.add(person.id);
       const descendants = sort((children.get(person.id) || []).filter(child => !nextPath.has(child.id)));
@@ -582,7 +598,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (pending.length) {
       const title = document.createElement('h4'); title.className = 'border-t pt-4 font-black text-[#72578f]'; title.textContent = 'Sin relación de aprobación asignada'; card.append(title);
       const unassigned = document.createElement('ul'); unassigned.className = 'mt-3 grid gap-2 sm:grid-cols-2';
-      for (const person of pending) { const item = document.createElement('li'); item.className = 'rounded-xl bg-slate-50 px-4 py-3 text-sm'; const name = personName(person); const role = document.createElement('div'); role.className = 'org-person-role'; role.textContent = roleName[person.role] || person.role || ''; const finance = document.createElement('div'); finance.className = 'org-person-finance'; finance.textContent = financeLabel(person); item.append(name, role, finance); unassigned.append(item); }
+      for (const person of pending) { const item = document.createElement('li'); item.className = 'rounded-xl bg-slate-50 px-4 py-3 text-sm'; const name = personName(person); const role = document.createElement('div'); role.className = 'org-person-role'; role.textContent = roleName[person.role] || person.role || ''; item.append(name, role); unassigned.append(item); }
       card.append(unassigned);
     }
     admSectionOrg.append(card);
