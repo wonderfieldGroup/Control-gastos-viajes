@@ -123,6 +123,19 @@ test('Admin organigram displays both assigned managers and unassigned employees 
  d.getElementById('admSubTabUsers').click();assert.equal(org.classList.contains('hidden'),true);
  await f.close();
 });
+test('Organigram lists larger direct teams first while keeping people under their managers',async()=>{
+ const f=await fixture('admin'),d=f.w.document;
+ f.w.authService.getUsers=()=>[{id:'root',name:'Daniel',role:'manager'},
+  {id:'a',name:'Alba',role:'manager',directBossId:'root'},
+  {id:'z',name:'Zoe',role:'manager',directBossId:'root'},
+  {id:'one',name:'Uno',role:'employee',directBossId:'z'},
+  {id:'two',name:'Dos',role:'employee',directBossId:'z'}];
+ d.getElementById('admSubTabOrg').click();
+ const teams=[...d.querySelectorAll('.org-roots > .org-node > .org-top-teams > .org-node')];
+ assert.equal(teams.length,2);assert.match(teams[0].firstElementChild.textContent,/Zoe/);
+ assert.match(teams[0].textContent,/Uno/);assert.match(teams[0].textContent,/Dos/);assert.match(teams[1].firstElementChild.textContent,/Alba/);
+ await f.close();
+});
 test('Full employee form saves a private draft, does not submit to manager, and groups by old expense date',async()=>{
  const f=await fixture(),d=f.w.document;
  assert.ok(d.querySelector('#employeeExpenseFolders details[data-key="draft:2024-09-01"]'));
