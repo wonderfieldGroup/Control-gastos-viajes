@@ -112,9 +112,12 @@ test('Admin organigram displays both assigned managers and unassigned employees 
  assert.match(org.textContent,/Daniel/);assert.match(org.textContent,/Piero/);
  assert.match(org.textContent,/Segundo aprobador: Piero/);assert.equal(org.querySelector('img'),null);
  const employee=[...org.querySelectorAll('.org-person')].find(el=>el.textContent.includes('<img src=x>'));
- assert.match(employee.textContent,/🇪🇸/);assert.match(employee.textContent,/Finanzas por país: Finanzas España/);
- assert.doesNotMatch(employee.textContent,/Finanzas Italia|Finanzas inactiva/);
- assert.match(org.textContent,/País pendiente · Finanzas sin determinar/);
+ assert.match(employee.textContent,/🇪🇸/);assert.match(employee.textContent,/Reporta a Daniel/);
+ assert.doesNotMatch(employee.textContent,/Finanzas/);
+ const countries=[...org.querySelectorAll('.org-finance-country')];
+ const spain=countries.find(el=>el.textContent.includes('España')), italy=countries.find(el=>el.textContent.includes('Italia'));
+ assert.match(spain.textContent,/Finanzas España/);assert.doesNotMatch(spain.textContent,/Finanzas Italia|Finanzas inactiva/);
+ assert.match(italy.textContent,/Finanzas Italia/);assert.ok(org.querySelector('.org-finance-section').compareDocumentPosition(org.querySelector('.org-viewport')) & f.w.Node.DOCUMENT_POSITION_FOLLOWING);
  assert.equal(org.querySelectorAll('ul ul li').length,1);
  assert.match(org.textContent,/Pendiente/);
  d.getElementById('admSubTabUsers').click();assert.equal(org.classList.contains('hidden'),true);
