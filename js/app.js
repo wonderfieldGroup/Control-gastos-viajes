@@ -524,7 +524,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const card = document.createElement('div');
     card.className = 'bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4';
     const heading = document.createElement('h3'); heading.className = 'font-black text-lg'; heading.textContent = 'Organigrama de aprobación';
-    const description = document.createElement('p'); description.className = 'text-sm text-slate-600'; description.textContent = 'Cada rama muestra el aprobador y las personas asignadas. Las cuentas sin aprobador aparecen en un grupo aparte.';
+    const description = document.createElement('p'); description.className = 'text-sm text-slate-600'; description.textContent = 'Las líneas conectan a cada aprobador con las personas asignadas. Desliza horizontalmente para explorar el organigrama completo.';
     card.append(heading, description);
     const children = new Map(users.map(u => [u.id, []]));
     for (const person of users) if (person.directBossId !== person.id && byId.has(person.directBossId)) children.get(person.directBossId).push(person);
@@ -532,26 +532,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     const rendered = new Set();
     const roleName = {manager:'Manager',employee:'Empleado',finance:'Finanzas'};
     function branch(person, path = new Set()) {
-      const li = document.createElement('li'); li.className = 'relative border-l-2 border-[#d6cfea] pl-4 pb-4';
-      const box = document.createElement('div'); box.className = 'rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm';
-      const name = document.createElement('div'); name.className = 'font-black text-[#302444]'; name.textContent = person.name || 'Sin nombre';
-      const details = document.createElement('div'); details.className = 'mt-1 text-xs font-bold text-slate-500';
+      const li = document.createElement('li'); li.className = 'org-node';
+      const box = document.createElement('div'); box.className = 'org-person';
+      const name = document.createElement('div'); name.className = 'org-person-name'; name.textContent = person.name || 'Sin nombre';
+      const details = document.createElement('div'); details.className = 'org-person-role';
       details.textContent = (roleName[person.role] || person.role || '') + (person.status === 'INACTIVE' ? ' · Inactivo' : '');
       box.append(name, details);
       if (person.secondaryBossId && byId.has(person.secondaryBossId)) {
-        const extra = document.createElement('div'); extra.className = 'mt-2 text-xs text-[#72578f]'; extra.textContent = 'Segundo aprobador: ' + byId.get(person.secondaryBossId).name; box.append(extra);
+        const extra = document.createElement('div'); extra.className = 'org-person-extra'; extra.textContent = 'Segundo aprobador: ' + byId.get(person.secondaryBossId).name; box.append(extra);
       }
       li.append(box); rendered.add(person.id);
       const nextPath = new Set(path); nextPath.add(person.id);
       const descendants = sort((children.get(person.id) || []).filter(child => !nextPath.has(child.id)));
-      if (descendants.length) { const list = document.createElement('ul'); list.className = 'mt-3 ml-2'; for (const child of descendants) list.append(branch(child, nextPath)); li.append(list); }
+      if (descendants.length) { const list = document.createElement('ul'); list.className = 'org-children'; for (const child of descendants) list.append(branch(child, nextPath)); li.append(list); }
       return li;
     }
     const roots = sort(users.filter(u => !u.directBossId || !byId.has(u.directBossId) || u.directBossId === u.id));
     const treeRoots = roots.filter(u => (children.get(u.id) || []).length);
-    const list = document.createElement('ul'); list.className = 'mt-4';
+    const viewport = document.createElement('div'); viewport.className = 'org-viewport'; viewport.tabIndex = 0; viewport.setAttribute('aria-label', 'Organigrama de aprobación; desplázate horizontalmente para ver todas las ramas');
+    const list = document.createElement('ul'); list.className = 'org-roots';
     for (const root of treeRoots) list.append(branch(root));
-    card.append(list);
+    viewport.append(list); card.append(viewport);
     const pending = sort(users.filter(u => !rendered.has(u.id)));
     if (pending.length) {
       const title = document.createElement('h4'); title.className = 'border-t pt-4 font-black text-[#72578f]'; title.textContent = 'Sin relación de aprobación asignada'; card.append(title);
