@@ -465,5 +465,23 @@ test('Fortnight workflow: real PostgreSQL, RLS, atomic batches and preserved leg
   await db.query('update public.profiles set direct_boss_id=null where id=$1',[id(6)]);assert.deepEqual(await access(),[]);
   await as(6,async()=>assert.equal((await db.query('select * from public.workflow_substitutions')).rows.length,0));
  });
+ await t.test('Manager and Finance substitutions for a dual-role principal remain independent', async () => {
+  await db.query("update public.profiles set role='manager',active=true,direct_boss_id=$1,finance_countries='{}' where id=$2",[id(2),id(7)]);
+  const create=kind=>as(8,()=>db.query('select public.admin_save_substitution($1,$2,$3,null,null) id',[kind,id(2),id(7)]));
+  const status=()=>as(7,async()=>(await db.query('select public.my_workflow_access() data')).rows[0].data);
+  const manager=(await create('manager')).rows[0].id;
+  let state=await status(); assert.ok(state.manager_ids.includes(id(2))); assert.deepEqual(state.finance_countries,[]);
+  await as(7,async()=>assert.equal((await db.query('select id from public.expenses where id=$1',[id(840)])).rows.length,1));
+  const finance=(await create('finance')).rows[0].id;
+  state=await status(); assert.ok(state.manager_ids.includes(id(2))); assert.deepEqual(state.finance_countries.sort(),['ES','FI']);
+  await as(8,()=>db.query('select public.admin_toggle_substitution($1,false)',[manager]));
+  state=await status(); assert.ok(!state.manager_ids.includes(id(2))); assert.deepEqual(state.finance_countries.sort(),['ES','FI']);
+  await as(8,()=>db.query('select public.admin_toggle_substitution($1,true)',[manager]));
+  await as(8,()=>db.query('select public.admin_toggle_substitution($1,false)',[finance]));
+  state=await status(); assert.ok(state.manager_ids.includes(id(2))); assert.deepEqual(state.finance_countries,[]);
+  await as(8,()=>db.query('select public.admin_toggle_substitution($1,false)',[manager]));
+  state=await status(); assert.ok(!state.manager_ids.includes(id(2))); assert.deepEqual(state.finance_countries,[]);
+  await as(7,async()=>assert.equal((await db.query('select id from public.expenses where id=$1',[id(840)])).rows.length,0));
+ });
  await db.close();
 });

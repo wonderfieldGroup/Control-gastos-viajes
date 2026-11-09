@@ -2,6 +2,31 @@ const {test}=require('node:test');const assert=require('node:assert/strict');con
 const {JSDOM,VirtualConsole}=require(process.env.JSDOM_MODULE||'jsdom');
 const root=path.join(__dirname,'..'),source=file=>fs.readFileSync(path.join(root,file),'utf8');
 const tick=()=>new Promise(resolve=>setTimeout(resolve,30));
+test('Finance dashboard accepts effective delegated access and clears it when revoked',()=>{
+ const dom=new JSDOM('<div id="dashboard"></div>',{url:'https://qa.example.invalid',runScripts:'outside-only'}),w=dom.window;
+ try {
+  w.eval(source('js/expenseDashboard.js'));
+  const dashboard=new w.ExpenseDashboard(w.document.getElementById('dashboard'),'finance',async()=>{});
+  const row={id:'e',employeeId:'employee',employee:'empleado',date:'2026-01-05',status:'APPROVED',amountEUR:20,category:'Comidas'};
+  const profile={id:'manager',role:'manager',status:'ACTIVE',workflowAccess:{finance_countries:['ZZ']}};
+  dashboard.update([row],profile,[]);assert.equal(dashboard.filtered.length,1);
+  dashboard.update([row],{...profile,workflowAccess:{finance_countries:[]}},[]);assert.equal(dashboard.filtered.length,0);
+ } finally { w.close(); }
+});
+test('Finance Excel export matches the selected status, trip and search filters',async()=>{
+ const f=await fixture('finance'),w=f.w,d=w.document;let exported=[];
+ w.excelExportService={exportToExcel:(rows,trip,label)=>exported.push({rows,trip,label})};
+ try {
+  d.querySelector('.fin-tab[data-filter="APPROVED"]').click();
+  d.getElementById('btnFinanceExportExcel').click();
+  assert.equal(exported.length,1); assert.deepEqual(Array.from(exported[0].rows,x=>x.id),['submitted']);
+  const search=d.getElementById('finSearchInput'); search.value='no match'; search.dispatchEvent(new w.Event('input'));
+  d.getElementById('btnFinanceExportExcel').click(); assert.equal(exported.length,1);
+  search.value='submitted';search.dispatchEvent(new w.Event('input'));
+  const trip=d.getElementById('finFilterTripSelect');trip.value='QA';trip.dispatchEvent(new w.Event('change'));
+  d.getElementById('btnFinanceExportExcel').click();assert.equal(exported.length,2);assert.deepEqual(Array.from(exported[1].rows,x=>x.id),['submitted']);assert.equal(exported[1].trip,'QA');
+ } finally { await f.close(); }
+});
 test('Admin modal requires another active Manager when opting in and sends the capability to the server',async()=>{
  const dom=new JSDOM('<button id="admSubTabUsers">Usuarios</button><section id="admSectionUsers"></section>',{url:'https://qa.example.invalid',runScripts:'outside-only'}),w=dom.window,d=w.document;
  await new Promise(resolve=>d.addEventListener('DOMContentLoaded',resolve,{once:true}));
