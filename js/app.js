@@ -524,7 +524,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const card = document.createElement('div');
     card.className = 'bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4';
     const heading = document.createElement('h3'); heading.className = 'font-black text-lg'; heading.textContent = 'Organigrama de aprobación';
-    const description = document.createElement('p'); description.className = 'text-sm text-slate-600'; description.textContent = 'Las líneas muestran quién aprueba los gastos de cada persona. Recorre las ramas hacia abajo para ver cada equipo.';
+    const description = document.createElement('p'); description.className = 'text-sm text-slate-600'; description.textContent = 'Cada columna muestra un equipo: arriba está su manager y debajo las personas que le reportan. Las columnas se ajustan a la pantalla.';
     card.append(heading, description);
     const children = new Map(users.map(u => [u.id, []]));
     for (const person of users) if (person.directBossId !== person.id && byId.has(person.directBossId)) children.get(person.directBossId).push(person);
@@ -563,7 +563,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       li.append(box); rendered.add(person.id);
       const nextPath = new Set(path); nextPath.add(person.id);
       const descendants = sort((children.get(person.id) || []).filter(child => !nextPath.has(child.id)));
-      if (descendants.length) { const list = document.createElement('ul'); list.className = 'org-children'; for (const child of descendants) list.append(branch(child, nextPath)); li.append(list); }
+      if (descendants.length) {
+        if (path.size === 0) {
+          const label = document.createElement('div'); label.className = 'org-team-label'; label.textContent = 'Reportan directamente a ' + (person.name || 'esta persona'); li.append(label);
+        }
+        const list = document.createElement('ul'); list.className = path.size === 0 ? 'org-children org-top-teams' : 'org-children';
+        for (const child of descendants) list.append(branch(child, nextPath)); li.append(list);
+      }
       return li;
     }
     const roots = sort(users.filter(u => !u.directBossId || !byId.has(u.directBossId) || u.directBossId === u.id));
