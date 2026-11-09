@@ -1159,6 +1159,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ----------------------------------------------------
   // RENDERIZADO: PESTAÑA 3 (FINANZAS)
   // ----------------------------------------------------
+  function filterFinanceExpenses(items) {
+    return items.filter(exp => {
+      if (finCurrentFilter !== 'all' && exp.status !== finCurrentFilter) return false;
+      if (finSelectedTrip && exp.trip !== finSelectedTrip) return false;
+      if (finSearchQuery) {
+        const q = finSearchQuery.toLowerCase();
+        const text = `${exp.employee} ${exp.trip} ${exp.reason} ${exp.category} ${exp.currency} ${exp.paymentRef || ''} ${exp.status}`.toLowerCase();
+        if (!text.includes(q)) return false;
+      }
+      return true;
+    });
+  }
   function renderFinanceDashboard() {
     const expenses = queueExpenses('finance');
     updateAnalytics(financeAnalytics);
@@ -1215,16 +1227,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     finStatIvaEUR.textContent = ivaEUR.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
     finStatIvaCount.textContent = ivaCount;
 
-    let filtered = expenses.filter(exp => {
-      if (finCurrentFilter !== 'all' && exp.status !== finCurrentFilter) return false;
-      if (finSelectedTrip && exp.trip !== finSelectedTrip) return false;
-      if (finSearchQuery) {
-        const q = finSearchQuery.toLowerCase();
-        const text = `${exp.employee} ${exp.trip} ${exp.reason} ${exp.category} ${exp.currency} ${exp.paymentRef || ''} ${exp.status}`.toLowerCase();
-        if (!text.includes(q)) return false;
-      }
-      return true;
-    });
+    let filtered = filterFinanceExpenses(expenses);
 
     finFilteredCountText.textContent = `Mostrando ${filtered.length} de ${expenses.length} registros`;
     const hasNewFinanceExpenses = filtered.some(e=>e.batchId);
@@ -1357,13 +1360,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   // EXPORTACIÓN A EXCEL (.xlsx) DESDE FINANZAS
   // ----------------------------------------------------
   btnFinanceExportExcel.addEventListener('click', () => {
-    if (expenses.length === 0) {
+    const filtered = filterFinanceExpenses(queueExpenses('finance'));
+    if (filtered.length === 0) {
       showToast('No hay gastos disponibles para exportar', 'error');
       return;
     }
 
     const filterLabel = finCurrentFilter === 'all' ? 'Todos los registros' : `Estado: ${finCurrentFilter}`;
-    window.excelExportService.exportToExcel(queueExpenses('finance'), finSelectedTrip, filterLabel);
+    window.excelExportService.exportToExcel(filtered, finSelectedTrip, filterLabel);
     showToast('📊 Reporte contable de The Wonderfield Group descargado en Excel (.xlsx)', 'success');
 
     if (window.confetti) {
