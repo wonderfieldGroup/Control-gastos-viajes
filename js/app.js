@@ -524,7 +524,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const card = document.createElement('div');
     card.className = 'bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4';
     const heading = document.createElement('h3'); heading.className = 'font-black text-lg'; heading.textContent = 'Organigrama de aprobación';
-    const description = document.createElement('p'); description.className = 'text-sm text-slate-600'; description.textContent = 'Las líneas conectan a cada aprobador con las personas asignadas. Desliza horizontalmente para explorar el organigrama completo.';
+    const description = document.createElement('p'); description.className = 'text-sm text-slate-600'; description.textContent = 'Las líneas muestran quién aprueba los gastos de cada persona. Recorre las ramas hacia abajo para ver cada equipo.';
     card.append(heading, description);
     const children = new Map(users.map(u => [u.id, []]));
     for (const person of users) if (person.directBossId !== person.id && byId.has(person.directBossId)) children.get(person.directBossId).push(person);
@@ -568,7 +568,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     const roots = sort(users.filter(u => !u.directBossId || !byId.has(u.directBossId) || u.directBossId === u.id));
     const treeRoots = roots.filter(u => (children.get(u.id) || []).length);
-    const viewport = document.createElement('div'); viewport.className = 'org-viewport'; viewport.tabIndex = 0; viewport.setAttribute('aria-label', 'Organigrama de aprobación; desplázate horizontalmente para ver todas las ramas');
+    const viewport = document.createElement('div'); viewport.className = 'org-viewport'; viewport.setAttribute('aria-label', 'Organigrama de aprobación');
     const list = document.createElement('ul'); list.className = 'org-roots';
     for (const root of treeRoots) list.append(branch(root));
     viewport.append(list); card.append(viewport);
