@@ -101,13 +101,20 @@ async function fixture(role='employee',reporting=false){
 test('Admin organigram displays both assigned managers and unassigned employees safely',async()=>{
  const f=await fixture('admin'),d=f.w.document;
  f.w.authService.getUsers=()=>[{id:'m1',name:'Daniel',role:'manager'},{id:'m2',name:'Piero',role:'manager'},
-  {id:'e',name:'<img src=x>',role:'employee',directBossId:'m1',secondaryBossId:'m2'},
+  {id:'e',name:'<img src=x>',role:'employee',countryCode:'ES',directBossId:'m1',secondaryBossId:'m2'},
+  {id:'f1',name:'Finanzas España',role:'finance',status:'ACTIVE',financeCountries:['ES']},
+  {id:'f2',name:'Finanzas Italia',role:'finance',status:'ACTIVE',financeCountries:['IT']},
+  {id:'f3',name:'Finanzas inactiva',role:'finance',status:'INACTIVE',financeCountries:['ES']},
   {id:'pending',name:'Pendiente',role:'employee'}];
  d.getElementById('admSubTabOrg').click();
  const org=d.getElementById('admSectionOrg');
  assert.equal(org.classList.contains('hidden'),false);
  assert.match(org.textContent,/Daniel/);assert.match(org.textContent,/Piero/);
  assert.match(org.textContent,/Segundo aprobador: Piero/);assert.equal(org.querySelector('img'),null);
+ const employee=[...org.querySelectorAll('.org-person')].find(el=>el.textContent.includes('<img src=x>'));
+ assert.match(employee.textContent,/🇪🇸/);assert.match(employee.textContent,/Finanzas por país: Finanzas España/);
+ assert.doesNotMatch(employee.textContent,/Finanzas Italia|Finanzas inactiva/);
+ assert.match(org.textContent,/País pendiente · Finanzas sin determinar/);
  assert.equal(org.querySelectorAll('ul ul li').length,1);
  assert.match(org.textContent,/Pendiente/);
  d.getElementById('admSubTabUsers').click();assert.equal(org.classList.contains('hidden'),true);
