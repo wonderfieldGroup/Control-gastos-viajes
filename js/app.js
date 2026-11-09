@@ -524,7 +524,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const card = document.createElement('div');
     card.className = 'bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4';
     const heading = document.createElement('h3'); heading.className = 'font-black text-lg'; heading.textContent = 'Organigrama de aprobación';
-    const description = document.createElement('p'); description.className = 'text-sm text-slate-600'; description.textContent = 'Cada columna muestra un equipo: arriba está su manager y debajo las personas que le reportan. Las columnas se ajustan a la pantalla.';
+    const description = document.createElement('p'); description.className = 'text-sm text-slate-600'; description.textContent = 'Los reportes directos aparecen en una sola línea, con sus equipos debajo. Desliza horizontalmente para ver todas las columnas.';
     card.append(heading, description);
     const children = new Map(users.map(u => [u.id, []]));
     for (const person of users) if (person.directBossId !== person.id && byId.has(person.directBossId)) children.get(person.directBossId).push(person);
@@ -579,6 +579,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       li.append(box); rendered.add(person.id);
       const nextPath = new Set(path); nextPath.add(person.id);
       const descendants = sort((children.get(person.id) || []).filter(child => !nextPath.has(child.id)));
+      if (path.size === 0) descendants.sort((a,b) => (children.get(b.id) || []).filter(child => !nextPath.has(child.id)).length - (children.get(a.id) || []).filter(child => !nextPath.has(child.id)).length || (a.name || '').localeCompare(b.name || ''));
       if (descendants.length) {
         if (path.size === 0) {
           const label = document.createElement('div'); label.className = 'org-team-label'; label.textContent = 'Reportan directamente a ' + (person.name || 'esta persona'); li.append(label);
@@ -590,7 +591,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     const roots = sort(users.filter(u => !u.directBossId || !byId.has(u.directBossId) || u.directBossId === u.id));
     const treeRoots = roots.filter(u => (children.get(u.id) || []).length);
-    const viewport = document.createElement('div'); viewport.className = 'org-viewport'; viewport.setAttribute('aria-label', 'Organigrama de aprobación');
+    const viewport = document.createElement('div'); viewport.className = 'org-viewport'; viewport.tabIndex = 0; viewport.setAttribute('aria-label', 'Organigrama de aprobación; desplázate horizontalmente para ver todos los equipos');
     const list = document.createElement('ul'); list.className = 'org-roots';
     for (const root of treeRoots) list.append(branch(root));
     viewport.append(list); card.append(viewport);
