@@ -126,6 +126,10 @@
       this.identity = profile.id;
       this.rows = [...new Map((rows || []).map(row => [row.id, row])).values()];
       this.directory = new Map((directory || []).map(profile => [profile.id, profile]));
+      for (const manager of profile.dashboardManagerNames || []) {
+        if (manager?.id && manager.full_name && !this.directory.has(manager.id))
+          this.directory.set(manager.id, { id: manager.id, name: manager.full_name });
+      }
       this.render();
     }
     clear() { this.identity = ''; this.rows = []; this.directory = new Map(); this.filters = defaultFilters(); this.page = 0; this.render(); }
