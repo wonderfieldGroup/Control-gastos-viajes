@@ -202,18 +202,26 @@ input::placeholder, textarea::placeholder {
 .org-children > .org-node::before { content: ''; position: absolute; top: 27px; right: 100%; width: clamp(16px, 2.8vw, 28px); border-top: 2px solid #9bb2c7; }
 .org-children > .org-node:last-child::after { content: ''; position: absolute; top: 29px; bottom: 0; right: calc(100% + clamp(16px, 2.8vw, 28px) - 2px); width: 2px; background: #f5f8fc; }
 .org-team-label { margin: 0 0 0 25px; padding: 18px 0 10px 16px; border-left: 2px solid #9bb2c7; color: #49667e; font-size: 12px; font-weight: 700; }
-.org-top-teams { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); align-items: start; gap: 14px; margin: 0; padding: 0; }
+.org-top-teams { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); align-items: start; gap: 10px; margin: 0; padding: 0; }
 .org-top-teams::before { display: none; }
-.org-top-teams > .org-node, .org-top-teams > .org-node:last-child { padding: 12px; border: 1px solid #d9e5ef; border-radius: 14px; background: #edf3f9; }
+.org-top-teams > .org-node, .org-top-teams > .org-node:last-child { padding: 8px; border: 1px solid #d9e5ef; border-radius: 14px; background: #edf3f9; }
 .org-top-teams > .org-node::before, .org-top-teams > .org-node:last-child::after { display: none; }
 .org-top-teams > .org-node > .org-person { width: 100%; }
 .org-top-teams .org-children { margin-left: 9px; padding-left: 15px; }
 .org-top-teams .org-children > .org-node::before { width: 15px; }
 .org-top-teams .org-children > .org-node:last-child::after { right: calc(100% + 13px); background: #edf3f9; }
-.org-person { box-sizing: border-box; width: min(100%, 440px); min-height: 80px; padding: 14px 16px; display: flex; flex-direction: column; justify-content: center; border: 1px solid #b9ccdc; border-left: 5px solid #17577e; border-radius: 12px; background: white; box-shadow: 0 4px 12px #143c5a12; }
+.org-person { box-sizing: border-box; width: min(100%, 340px); min-height: 58px; padding: 10px 12px; display: flex; flex-direction: column; justify-content: center; border: 1px solid #b9ccdc; border-left: 4px solid #17577e; border-radius: 10px; background: white; box-shadow: 0 4px 12px #143c5a12; }
 .org-roots > .org-node > .org-person { border-left-color: #433364; box-shadow: 0 5px 16px #43336418; }
 .org-person-name { color: #172b44; font-weight: 800; font-size: 14px; line-height: 1.25; overflow-wrap: anywhere; }
 .org-person-role { margin-top: 6px; color: #49667e; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.org-person-boss { margin-top: 7px; color: #694e87; font-size: 11px; font-weight: 700; line-height: 1.3; }
+.org-finance-section { padding: 16px; border: 1px solid #cde6dc; border-radius: 16px; background: #f2faf6; }
+.org-finance-title { margin: 0; color: #125f4e; font-size: 16px; font-weight: 800; }
+.org-finance-note { margin: 4px 0 12px; color: #52746a; font-size: 12px; }
+.org-finance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 8px; list-style: none; padding: 0; margin: 0; }
+.org-finance-country { padding: 10px 12px; border: 1px solid #d1e7dd; border-radius: 10px; background: white; }
+.org-finance-country-name { color: #175e50; font-size: 13px; font-weight: 800; }
+.org-finance-people { margin-top: 4px; color: #365a51; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
 .org-person-extra { margin-top: 8px; color: #72578f; font-size: 11px; line-height: 1.3; overflow-wrap: anywhere; }
 .org-person-flag { font-size: 17px; }
 .org-person-finance { margin-top: 9px; padding-top: 7px; border-top: 1px solid #dbe7e2; color: #087a63; font-size: 11px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
