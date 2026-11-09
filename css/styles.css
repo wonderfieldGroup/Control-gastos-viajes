@@ -191,9 +191,9 @@ input::placeholder, textarea::placeholder {
   }
 }
 /* Top-level teams sit side by side; each team branches vertically. */
-.org-viewport { min-width: 0; overflow-wrap: anywhere; border: 1px solid #e4e9f1; border-radius: 20px; background: #f5f8fc; padding: clamp(14px, 3vw, 28px); }
+.org-viewport { min-width: 0; max-width: 100%; overflow-x: auto; overflow-wrap: anywhere; border: 1px solid #e4e9f1; border-radius: 20px; background: #f5f8fc; padding: clamp(14px, 3vw, 28px); }
 .org-roots, .org-children { min-width: 0; margin: 0; padding: 0; list-style: none; }
-.org-roots { display: grid; gap: 24px; }
+.org-roots { display: grid; gap: 24px; width: max-content; min-width: 100%; }
 .org-node { position: relative; min-width: 0; box-sizing: border-box; }
 .org-children { position: relative; margin-left: clamp(10px, 2.4vw, 26px); padding: 16px 0 0 clamp(16px, 2.8vw, 28px); }
 .org-children::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; border-left: 2px solid #9bb2c7; }
@@ -201,17 +201,23 @@ input::placeholder, textarea::placeholder {
 .org-children > .org-node:last-child { padding-bottom: 0; }
 .org-children > .org-node::before { content: ''; position: absolute; top: 27px; right: 100%; width: clamp(16px, 2.8vw, 28px); border-top: 2px solid #9bb2c7; }
 .org-children > .org-node:last-child::after { content: ''; position: absolute; top: 29px; bottom: 0; right: calc(100% + clamp(16px, 2.8vw, 28px) - 2px); width: 2px; background: #f5f8fc; }
-.org-team-label { margin: 0 0 0 25px; padding: 18px 0 10px 16px; border-left: 2px solid #9bb2c7; color: #49667e; font-size: 12px; font-weight: 700; }
-.org-top-teams { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); align-items: start; gap: 10px; margin: 0; padding: 0; }
+.org-team-label { position: relative; text-align: center; padding: 18px 0 14px; color: #49667e; font-size: 12px; font-weight: 700; }
+.org-team-label::before, .org-team-label::after { content: ''; position: absolute; left: 50%; width: 2px; background: #9bb2c7; }
+.org-team-label::before { top: 0; height: 13px; }
+.org-team-label::after { bottom: 0; height: 10px; }
+.org-top-teams { display: flex; justify-content: center; align-items: flex-start; width: max-content; min-width: 100%; gap: 0; margin: 0; padding: 0; }
 .org-top-teams::before { display: none; }
-.org-top-teams > .org-node, .org-top-teams > .org-node:last-child { padding: 8px; border: 1px solid #d9e5ef; border-radius: 14px; background: #edf3f9; }
-.org-top-teams > .org-node::before, .org-top-teams > .org-node:last-child::after { display: none; }
+.org-top-teams > .org-node, .org-top-teams > .org-node:last-child { flex: 0 0 190px; width: 190px; padding: 20px 5px 0; }
+.org-top-teams > .org-node::before { display: block; top: 0; left: 0; right: 0; width: auto; border-top: 2px solid #9bb2c7; }
+.org-top-teams > .org-node:first-child::before { left: 50%; }
+.org-top-teams > .org-node:last-child::before { right: 50%; }
+.org-top-teams > .org-node::after, .org-top-teams > .org-node:last-child::after { display: block; content: ''; position: absolute; left: 50%; right: auto; top: 0; bottom: auto; width: 2px; height: 20px; background: #9bb2c7; }
 .org-top-teams > .org-node > .org-person { width: 100%; }
 .org-top-teams .org-children { margin-left: 9px; padding-left: 15px; }
 .org-top-teams .org-children > .org-node::before { width: 15px; }
-.org-top-teams .org-children > .org-node:last-child::after { right: calc(100% + 13px); background: #edf3f9; }
+.org-top-teams .org-children > .org-node:last-child::after { right: calc(100% + 13px); background: #f5f8fc; }
 .org-person { box-sizing: border-box; width: min(100%, 340px); min-height: 58px; padding: 10px 12px; display: flex; flex-direction: column; justify-content: center; border: 1px solid #b9ccdc; border-left: 4px solid #17577e; border-radius: 10px; background: white; box-shadow: 0 4px 12px #143c5a12; }
-.org-roots > .org-node > .org-person { border-left-color: #433364; box-shadow: 0 5px 16px #43336418; }
+.org-roots > .org-node > .org-person { margin: 0 auto; border-left-color: #433364; box-shadow: 0 5px 16px #43336418; }
 .org-person-name { color: #172b44; font-weight: 800; font-size: 14px; line-height: 1.25; overflow-wrap: anywhere; }
 .org-person-role { margin-top: 6px; color: #49667e; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 .org-person-boss { margin-top: 7px; color: #694e87; font-size: 11px; font-weight: 700; line-height: 1.3; }
