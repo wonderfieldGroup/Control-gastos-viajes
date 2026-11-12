@@ -207,6 +207,7 @@ if (actor?.role !== "admin" && !isVerifiedAdminIdentity) return reply(request, 4
 if (action === "list_users") {
 const { data, error } = await admin.from("profiles")
 .select("id,email,username,full_name,role,active,region,direct_boss_id,secondary_boss_id,expense_reporting_enabled,must_change_password,created_at,updated_at")
+.is("archived_at", null)
 .order("full_name", { ascending: true });
 if (error) throw error;
 return reply(request, 200, { users: (data || []).map(publicProfile) });
@@ -249,29 +250,33 @@ return reply(request, 201, { user: publicProfile(profile) });
 const targetId = cleanText(payload.user_id, 36);
 if (!uuidPattern.test(targetId)) return reply(request, 400, { error: "Usuario no válido." });
 const { data: target, error: targetError } = await admin.from("profiles")
-.select("id,role,active,direct_boss_id,secondary_boss_id,expense_reporting_enabled")
+.select("id,role,active,direct_boss_id,secondary_boss_id,expense_reporting_enabled,archived_at")
 .eq("id", targetId)
 .maybeSingle();
 if (targetError || !target) return reply(request, 404, { error: "Usuario no encontrado." });
+if (target.archived_at) return reply(request, 404, { error: "Usuario no encontrado." });
 if (target.id === actorId || target.role === "admin") return reply(request, 403, { error: "La cuenta administradora no se modifica desde este panel." });
 
 if (action === "delete_user") {
 if (actor?.role !== "admin" || !actor.active) return reply(request, 403, { error: "Se requiere una cuenta administradora activa." });
-const { count: expenseCount, error: expenseCheckError } = await admin.from("expenses").select("id", { count: "exact", head: true }).eq("employee_id", target.id);
-if (expenseCheckError) throw expenseCheckError;
-if ((expenseCount || 0) > 0) return reply(request, 409, { error: "La cuenta tiene gastos asociados. Desactívala para conservar el historial." });
-const { count: teamCount, error: teamError } = await admin.from("profiles").select("id", { count: "exact", head: true }).eq("direct_boss_id", target.id);
+const { count: teamCount, error: teamError } = await admin.from("profiles").select("id", { count: "exact", head: true }).eq("direct_boss_id", target.id).is("archived_at", null);
 if (teamError) throw teamError;
-const { count: secondTeamCount, error: secondTeamError } = await admin.from("profiles").select("id", { count: "exact", head: true }).eq("secondary_boss_id", target.id);
+const { count: secondTeamCount, error: secondTeamError } = await admin.from("profiles").select("id", { count: "exact", head: true }).eq("secondary_boss_id", target.id).is("archived_at", null);
 if (secondTeamError) throw secondTeamError;
 if ((teamCount || 0) > 0 || (secondTeamCount || 0) > 0) return reply(request, 409, { error: "Asigna otro manager a sus colaboradores antes de eliminar esta cuenta." });
-const { data: auditEntry, error: auditError } = await admin.from("admin_audit_log").insert({ actor_id: actorId, target_user_id: target.id, action: "USER_DELETED", metadata: { role: target.role } }).select("id").single();
-if (auditError) throw auditError;
-const { error: deleteError } = await admin.auth.admin.deleteUser(target.id, false);
+// Disable portal access before removing credentials. Keep the profile and expense
+// references for reporting, audit and the recoverable expense trash.
+const { error: disableError } = await admin.from("profiles").update({ active: false }).eq("id", target.id);
+if (disableError) throw disableError;
+const { data: auditEntry, error: auditError } = await admin.from("admin_audit_log").insert({ actor_id: actorId, target_user_id: target.id, action: "USER_DELETED", metadata: { role: target.role, preserved_history: true } }).select("id").single();
+if (auditError) return reply(request, 503, { error: "La cuenta se desactivó, pero no se pudo registrar la eliminación. Contacta al administrador." });
+const { error: deleteError } = await admin.auth.admin.deleteUser(target.id, true);
 if (deleteError) {
-await admin.from("admin_audit_log").delete().eq("id", auditEntry.id);
-return reply(request, 409, { error: "No se puede eliminar una cuenta con registros o archivos asociados. Desactívala para conservar el historial." });
+  await admin.from("admin_audit_log").delete().eq("id", auditEntry.id);
+  return reply(request, 409, { error: "La cuenta quedó desactivada, pero no se pudo eliminar su acceso. Contacta al administrador." });
 }
+const { error: archiveError } = await admin.from("profiles").update({ archived_at: new Date().toISOString() }).eq("id", target.id);
+if (archiveError) return reply(request, 503, { error: "El acceso se eliminó, pero la cuenta aún puede aparecer en la lista. Contacta al administrador." });
 return reply(request, 200, { ok: true });
 }
 
