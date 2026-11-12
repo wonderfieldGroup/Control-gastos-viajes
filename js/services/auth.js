@@ -30,7 +30,7 @@ class AuthService {
     ]);
     if (this.profile?.id !== actorId) return [];
     if (!error) {
-      const rows = data || [];
+      const rows = (data || []).filter(row => !row.archived_at);
       this.directory = rows.map(row => {
         const boss = rows.find(profile => profile.id === row.direct_boss_id);
         const secondBoss = rows.find(profile => profile.id === row.secondary_boss_id);
