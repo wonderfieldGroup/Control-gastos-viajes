@@ -71,7 +71,7 @@
   document.addEventListener('click', async (event) => {
     const button = event.target.closest('[data-delete]');
     if (!button || button.disabled || !window.authService?.isAuthenticated('admin')) return;
-    if (!confirm('¿Eliminar permanentemente esta cuenta? Esta acción no se puede deshacer. Las cuentas con gastos deben desactivarse para conservar el historial.')) return;
+    if (!confirm('¿Eliminar el acceso de esta cuenta? No se podrá recuperar el acceso. Sus gastos e historial se conservarán. Si tiene colaboradores, primero debes reasignarlos.')) return;
     button.disabled = true;
     try {
       await window.adminUserService.delete(button.dataset.delete);
