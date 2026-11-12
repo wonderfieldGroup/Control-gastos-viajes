@@ -1,0 +1,14 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
+function fixture({role='admin',team=0,failDelete=false}={}){
+ const records=[{id:id(1),role,active:true,email:'admin@example.invalid'},{id:id(2),role:'employee',active:true,archived_at:null}]; const calls=[];let handler;
+ const client={auth:{getUser:async()=>({data:{user:{id:id(1),email:'admin@example.invalid'}}}),admin:{deleteUser:async (...args)=>{calls.push(args);return {error:failDelete?{message:'failed'}:null};}}},from(table){
+ let op='select',filter,values,head=false; const q={select(_x,opts){head=!!opts?.head;return q},eq(k,v){filter=[k,v];return q},update(v){op='update';values=v;return q},insert(v){op='insert';values=v;return q},delete(){op='delete';return q},is(){return q},order(){return q},
+ async maybeSingle(){return {data:records.find(x=>x[filter?.[0]]===filter?.[1])||null,error:null}},async single(){return {data:{id:10},error:null}},then(resolve){if(op==='update'){Object.assign(records.find(x=>x[filter[0]]===filter[1]),values);return Promise.resolve({error:null}).then(resolve)} if(head)return Promise.resolve({count:team,error:null}).then(resolve);return Promise.resolve({data:[],error:null}).then(resolve)}};return q;}};
+ const src=fs.readFileSync('supabase/functions/admin-user-management/index.ts','utf8').replace(/^import[^\n]+\n/,'');vm.runInNewContext(src,{createClient:()=>client,Deno:{env:{get:()=> 'test'},serve:h=>handler=h},Response,Set,crypto,TextEncoder,console});
+ return {records,calls,async request(){let r=await handler(new Request('https://example.invalid/',{method:'POST',headers:{origin:'https://control-gastos-viajes.pages.dev',authorization:'Bearer token','content-type':'application/json'},body:JSON.stringify({action:'delete_user',user_id:id(2)})}));return {status:r.status,body:await r.json()}}};
+}
+test('Elimina acceso conservando perfil e historial',async()=>{let f=fixture(),r=await f.request();assert.equal(r.status,200);assert.equal(f.records[1].active,false);assert.ok(f.records[1].archived_at);assert.deepEqual(f.calls[0],[id(2),true]);});
+test('Un manager con colaboradores no se elimina',async()=>{let f=fixture({team:1}),r=await f.request();assert.equal(r.status,409);assert.equal(f.records[1].active,true);assert.equal(f.calls.length,0);});
+test('Un no administrador no puede eliminar',async()=>{let f=fixture({role:'finance'}),r=await f.request();assert.equal(r.status,403);assert.equal(f.calls.length,0);});
+test('Fallo de Auth deja cuenta desactivada y visible para revisión',async()=>{let f=fixture({failDelete:true}),r=await f.request();assert.equal(r.status,409);assert.equal(f.records[1].active,false);assert.equal(f.records[1].archived_at,null);});
