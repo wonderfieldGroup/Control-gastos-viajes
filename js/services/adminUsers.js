@@ -26,6 +26,25 @@ class AdminUserService {
 
   async list() { return (await this.request('list_users')).users || []; }
   async create(payload) { return (await this.request('create_user', payload)).user; }
+  async createChecked(payload) {
+    const email = String(payload.email || '').trim().toLowerCase();
+    const username = String(payload.username || '').trim().toLowerCase();
+    const findMatch = users => users.find(user => String(user.email || '').trim().toLowerCase() === email || String(user.username || '').trim().toLowerCase() === username);
+    const existing = findMatch(await this.list());
+    if (existing) throw new Error('Ya existe una cuenta con ese usuario o correo. Revísala en la lista antes de continuar.');
+    try { return await this.create(payload); }
+    catch (error) {
+      try {
+        const match = findMatch(await this.list());
+        if (match) throw new Error('La cuenta aparece en la lista. Revisa sus datos antes de volver a intentarlo; si no puedes ingresar, restablece la contraseña.');
+      } catch (checkError) {
+        if (checkError.message.startsWith('La cuenta aparece')) throw checkError;
+        throw new Error('No se pudo confirmar si se creó la cuenta. Revisa la lista antes de volver a intentarlo.');
+      }
+      throw error;
+    }
+  }
+
   async update(userId, payload) { return (await this.request('update_user', { user_id: userId, ...payload })).user; }
   async delete(userId) { return this.request('delete_user', { user_id: userId }); }
   async resetPassword(userId, temporaryPassword) {
