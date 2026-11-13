@@ -590,11 +590,39 @@ document.addEventListener('DOMContentLoaded', async () => {
       return li;
     }
     const roots = sort(users.filter(u => !u.directBossId || !byId.has(u.directBossId) || u.directBossId === u.id));
-    const treeRoots = roots.filter(u => (children.get(u.id) || []).length);
+    const treeRoots = roots.filter(u => (children.get(u.id) || []).length)
+      .sort((a, b) => (children.get(b.id) || []).length - (children.get(a.id) || []).length || (a.name || '').localeCompare(b.name || ''));
     const viewport = document.createElement('div'); viewport.className = 'org-viewport'; viewport.tabIndex = 0; viewport.setAttribute('aria-label', 'Organigrama de aprobación; desplázate horizontalmente para ver todos los equipos');
     const list = document.createElement('ul'); list.className = 'org-roots';
     for (const root of treeRoots) list.append(branch(root));
     viewport.append(list); card.append(viewport);
+    // Place one small independent tree into genuinely unused space below the
+    // last team, but keep it a separate root and fall back to a new row if it fits poorly.
+    if (treeRoots.length >= 2 && (children.get(treeRoots[0].id) || []).length >= 4 && (children.get(treeRoots[1].id) || []).length === 1) {
+      const main = list.children[0], independent = list.children[1];
+      independent.classList.add('org-independent');
+      const label = document.createElement('div'); label.className = 'org-independent-label'; label.textContent = 'Línea de aprobación independiente';
+      independent.prepend(label);
+      requestAnimationFrame(() => {
+        if (!list.isConnected) return;
+        const teams = main.querySelector('.org-top-teams');
+        const last = teams?.lastElementChild?.querySelector('.org-person');
+        if (!last) return;
+        const bounds = list.getBoundingClientRect(), end = last.getBoundingClientRect();
+        const left = Math.max(0, bounds.width - independent.offsetWidth - 10);
+        const top = end.bottom - bounds.top + 24;
+        const width = independent.offsetWidth, height = independent.offsetHeight;
+        const overlaps = [...main.querySelectorAll('.org-person')].some(box => {
+          const r = box.getBoundingClientRect();
+          return r.right > bounds.left + left - 12 && r.left < bounds.left + left + width + 12 &&
+            r.bottom > bounds.top + top - 12 && r.top < bounds.top + top + height + 12;
+        });
+        if (!overlaps && top + height <= main.offsetHeight) {
+          independent.style.left = left + 'px'; independent.style.top = top + 'px';
+          independent.classList.add('org-independent-placed');
+        }
+      });
+    }
     const pending = sort(users.filter(u => !rendered.has(u.id)));
     if (pending.length) {
       const title = document.createElement('h4'); title.className = 'border-t pt-4 font-black text-[#72578f]'; title.textContent = 'Sin relación de aprobación asignada'; card.append(title);
@@ -2082,6 +2110,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       .replace(/'/g, '&#039;');
   }
 });
+
 
 
 
