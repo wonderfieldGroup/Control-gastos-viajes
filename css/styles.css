@@ -193,7 +193,7 @@ input::placeholder, textarea::placeholder {
 /* Top-level teams sit side by side; each team branches vertically. */
 .org-viewport { min-width: 0; max-width: 100%; overflow-x: auto; overflow-wrap: anywhere; border: 1px solid #e4e9f1; border-radius: 20px; background: #f5f8fc; padding: clamp(14px, 3vw, 28px); }
 .org-roots, .org-children { min-width: 0; margin: 0; padding: 0; list-style: none; }
-.org-roots { display: grid; gap: 24px; width: max-content; min-width: 100%; }
+.org-roots { position: relative; display: grid; gap: 24px; width: max-content; min-width: 100%; }
 .org-node { position: relative; min-width: 0; box-sizing: border-box; }
 .org-children { position: relative; margin-left: clamp(10px, 2.4vw, 26px); padding: 16px 0 0 clamp(16px, 2.8vw, 28px); }
 .org-children::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; border-left: 2px solid #9bb2c7; }
@@ -232,3 +232,9 @@ input::placeholder, textarea::placeholder {
 .org-person-flag { font-size: 17px; }
 .org-person-finance { margin-top: 9px; padding-top: 7px; border-top: 1px solid #dbe7e2; color: #087a63; font-size: 11px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
 .org-viewport:focus-visible { outline: 3px solid #765aaa; outline-offset: 2px; }
+
+/* Independent trees can occupy spare chart space without implying a reporting link. */
+.org-roots > .org-independent { width: 240px; justify-self: end; padding: 14px; border: 1px solid #d3dce8; border-radius: 14px; background: #fff; box-shadow: 0 4px 14px #143c5a0d; }
+.org-roots > .org-independent-placed { position: absolute; z-index: 1; }
+.org-independent-label { margin-bottom: 12px; color: #49667e; font-size: 11px; font-weight: 800; text-align: center; }
+.org-independent .org-top-teams > .org-node { flex-basis: 190px; }
